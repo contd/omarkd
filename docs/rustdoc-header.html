@@ -1,0 +1,25 @@
+<!-- Injected into every Rustdoc page published at docs/typedoc/rust/. Rustdoc's
+     rootPath points at rust/, so the parent directory is the unified Omarkd site. -->
+<style>
+  .omarkd-site { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1.25rem; margin: 0 0 1.25rem; padding-bottom: .75rem; border-bottom: 1px solid var(--border-color, #ccc); font-family: "Fira Sans", Arial, sans-serif; }
+  .omarkd-site a { color: var(--main-color, inherit); text-decoration: none; }
+  .omarkd-site a:hover { text-decoration: underline; }
+  .omarkd-site .omarkd-title { display: inline-flex; align-items: center; gap: .5rem; font-size: 1.15rem; font-weight: 600; margin-right: auto; }
+  .omarkd-site img { width: 1.6rem; height: 1.6rem; }
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const vars = document.querySelector('meta[name="rustdoc-vars"]');
+    const site = `${vars?.dataset.rootPath ?? "./"}../`;
+    for (const icon of document.querySelectorAll('link[rel~="icon"]')) icon.remove();
+    document.head.insertAdjacentHTML("beforeend", `<link rel="icon" href="${site}assets/favicon.svg" type="image/svg+xml">`);
+    const bar = document.createElement("nav");
+    bar.className = "omarkd-site";
+    bar.setAttribute("aria-label", "Omarkd documentation");
+    bar.innerHTML = `<a class="omarkd-title" href="${site}index.html"><img src="${site}assets/favicon.svg" alt="">Omarkd</a>`
+      + `<a href="${site}index.html">Docs home</a>`
+      + `<a href="${site}reports/unit/index.html">Unit tests &amp; coverage</a>`
+      + `<a href="${site}reports/e2e/index.html">Playwright E2E results</a>`;
+    document.querySelector("main")?.prepend(bar);
+  });
+</script>

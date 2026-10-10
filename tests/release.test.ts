@@ -198,7 +198,9 @@ describe("release and Pages workflow contracts", () => {
       expect(steps.some(step => step.run === command)).toBe(true);
     }
     expect(steps.some(step => step.run?.includes("playwright install --with-deps chromium"))).toBe(true);
-    expect(steps.some(step => step.run?.includes("cp -R src-tauri/target/doc docs/typedoc/rust"))).toBe(true);
+    // `bun run docs` publishes Rustdoc itself, so CI must not copy a second stale tree.
+    expect(steps.some(step => step.run?.includes("target/doc"))).toBe(false);
+    expect(steps.some(step => step.run === "touch docs/typedoc/.nojekyll")).toBe(true);
     const upload = steps.find(step => step.uses === "actions/upload-pages-artifact@v5");
     expect(upload?.with?.path).toBe("docs/typedoc");
     expect(upload?.with?.["include-hidden-files"]).toBe(true);

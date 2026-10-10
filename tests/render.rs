@@ -6,7 +6,7 @@
 use super::*;
 
 /// CommonMark/GFM constructs must yield expected markup, stable headings and emoji.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn renders_commonmark_and_github_features() {
     let html = render_markdown("# Title\n\n**bold** *italic* ~~strike~~ `inline` ^sup^\n\nhttps://example.com :rocket:\n\n- [x] done\n- [ ] todo\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n> [!NOTE]\n> notice\n", None);
     for expected in [
@@ -28,7 +28,7 @@ fn renders_commonmark_and_github_features() {
 }
 
 /// Definition lists, wiki links, footnotes and embedded details survive; front matter stays hidden.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn renders_extended_features_and_hides_front_matter() {
     let html = render_markdown("---\nsecret: hidden\n---\n# Hello\n\nTerm\n: Definition\n\n[[second.md|Second]]\n\nFootnote[^one].\n\n[^one]: Footnote body.\n\n<details><summary>More</summary>Content</details>\n", None);
     for expected in [
@@ -47,7 +47,7 @@ fn renders_extended_features_and_hides_front_matter() {
 }
 
 /// Math stays marked for Temml, and Mermaid source is escaped rather than interpreted as HTML.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn emits_math_markers_and_escaped_mermaid_source() {
     let html = render_markdown("$x^2$\n\n$$x+y$$\n\n```math\n\\frac{1}{2}\n```\n\n```mermaid\ngraph TD; A[\"<script>&\"]-->B;\n```\n", None);
     assert!(html.contains("data-math-style=\"inline\""));
@@ -58,7 +58,7 @@ fn emits_math_markers_and_escaped_mermaid_source() {
 }
 
 /// Extended language definitions produce class-based highlighting without fixed inline colors.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn highlights_extended_languages_without_inline_styles() {
     warm_up();
     // These exercise the shared cached highlighter, including two-face's TypeScript syntax.
@@ -82,7 +82,7 @@ fn highlights_extended_languages_without_inline_styles() {
 }
 
 /// Unknown fence languages are escaped readable code; an empty document renders no markup.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn unknown_languages_and_empty_documents_remain_readable() {
     let html = render_markdown("```unknown-omarkd-language\n<hello>&world\n```", None);
     assert!(html.contains("&lt;hello&gt;&amp;world"));
@@ -90,7 +90,7 @@ fn unknown_languages_and_empty_documents_remain_readable() {
 }
 
 /// Relative/local images use Tauri assets while remote, fragment and data URLs remain unchanged.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn rewrites_document_relative_images_and_preserves_external_urls() {
     let rewrite = ImageRewriter {
         base_dir: PathBuf::from("/tmp/docs"),
@@ -117,7 +117,7 @@ fn rewrites_document_relative_images_and_preserves_external_urls() {
 }
 
 /// Scheme classification must not treat Windows drive letters as an external URL scheme.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn detects_schemes_and_not_windows_drives() {
     for url in [
         "https://example.com",
@@ -137,7 +137,7 @@ fn detects_schemes_and_not_windows_drives() {
 }
 
 /// UTF-8 and reserved bytes round-trip; malformed escapes are retained and invalid bytes decode lossily.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn percent_encoding_roundtrips_unicode_spaces_and_reserved_characters() {
     for text in ["", "plain-_.~123", "/a b/#%?&", "café/文.md"] {
         assert_eq!(percent_decode(&percent_encode(text)), text);
@@ -148,7 +148,7 @@ fn percent_encoding_roundtrips_unicode_spaces_and_reserved_characters() {
 }
 
 /// HTML-significant characters are escaped while ordinary apostrophes/text stay readable.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn escapes_html_metacharacters() {
     let mut output = String::new();
     escape_into(&mut output, "<>&\"' text").unwrap();
@@ -156,7 +156,7 @@ fn escapes_html_metacharacters() {
 }
 
 /// Every generated selector is palette-scoped; manual app themes do not depend on media queries.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn css_has_both_themes_with_every_selector_scoped() {
     let css = highlight_css();
     assert!(css.contains(":where(:root[data-theme=\"light\"]) .sx-code"));
@@ -174,7 +174,7 @@ fn css_has_both_themes_with_every_selector_scoped() {
 }
 
 /// Selector-list and descendant formatting stays exact, with declarations preserved unchanged.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn scopes_highlight_selector_lists_and_descendants() {
     assert_eq!(
         scope_highlight_css(".sx-string, .sx-source.sx-rust .sx-keyword {\n color: #fff;\n}", "dark"),

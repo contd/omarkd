@@ -3,8 +3,11 @@
  * Run before creating release assets so a mistag cannot publish mislabeled binaries.
  * @packageDocumentation
  */
+// @ts-ignore Node.js built-in type declarations are unavailable in this project.
 import { readFileSync, writeFileSync } from "node:fs";
+// @ts-ignore Node.js built-in type declarations are unavailable in this project.
 import { resolve } from "node:path";
+// @ts-ignore Node.js built-in type declarations are unavailable in this project.
 import { fileURLToPath } from "node:url";
 
 /** Canonical release tags allow SemVer prereleases, but not build metadata. */
@@ -58,7 +61,7 @@ export function syncReleaseVersions(root: string): string[] {
     const path = resolve(root, file);
     const contents = readFileSync(path, "utf8");
     if (!pattern.test(contents)) throw new Error(`${file} is missing the Omarkd package version.`);
-    const updated = contents.replace(pattern, (_match, before: string, after: string) => `${before}${version}${after}`);
+    const updated = contents.replace(pattern, (_match: string, before: string, after: string) => `${before}${version}${after}`);
     // The first "version" key could belong to a nested object; require the top-level field changed.
     if (file.endsWith(".json") && JSON.parse(updated).version !== version) {
       throw new Error(`${file} top-level version could not be updated safely; edit it manually.`);
@@ -72,13 +75,14 @@ export function syncReleaseVersions(root: string): string[] {
   return updates.map(([, file]) => file);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const argument = process.argv[2];
+const runtime = (globalThis as typeof globalThis & { process?: { argv: string[]; cwd(): string } }).process;
+if (runtime?.argv[1] && resolve(runtime.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argument = runtime.argv[2];
   if (argument === "--sync") {
-    const changed = syncReleaseVersions(process.cwd());
+    const changed = syncReleaseVersions(runtime.cwd());
     console.log(changed.length ? `Synchronized version in: ${changed.join(", ")}` : "Versions already synchronized.");
   } else if (argument) {
-    console.log(`Release version verified: ${checkReleaseTag(argument, readReleaseVersions(process.cwd()))}`);
+    console.log(`Release version verified: ${checkReleaseTag(argument, readReleaseVersions(runtime.cwd()))}`);
   } else {
     throw new Error("Usage: bun run release:check vMAJOR.MINOR.PATCH | bun run version:sync");
   }

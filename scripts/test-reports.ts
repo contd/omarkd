@@ -38,8 +38,8 @@ export function reportPage(title: string, runs: ReportRun[], links: Record<strin
 <title>${escapeHtml(title)} | Omarkd</title>
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
 <style>body{font:16px system-ui;max-width:1100px;margin:2rem auto;padding:0 1rem}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f8fa;padding:1rem}a{color:#0969da}.failed{color:#b42318}.site-title{display:inline-flex;align-items:center;gap:.5rem}.site-title img{width:1.75rem;height:1.75rem}</style>
-<p><a class="site-title" href="../../index.html"><img src="../../assets/favicon.svg" alt="">Omarkd TypeScript API</a></p>
-<nav><a href="../../index.html">TypeScript API</a> · <a href="../unit/index.html">Unit tests &amp; coverage</a> · <a href="../e2e/index.html">Playwright E2E</a></nav>
+<p><a class="site-title" href="../../index.html"><img src="../../assets/favicon.svg" alt="">Omarkd</a></p>
+<nav><a href="../../index.html">Docs home</a> · <a href="../../rust/omarkd_lib/index.html">Rust API</a> · <a href="../unit/index.html">Unit tests &amp; coverage</a> · <a href="../e2e/index.html">Playwright E2E</a></nav>
 <h1>${escapeHtml(title)}</h1>
 <p>Fresh runner output, not a hand-written summary. Coverage measures execution, not correctness.
 Browser tests mock native desktop APIs; real OS integrations require the README smoke checks.</p>
@@ -52,19 +52,20 @@ ${runs.map(run => `<section><h2>${escapeHtml(run.command)}</h2>
 
 /**
  * Makes TypeDoc's literal navigation links portable from nested module/class pages.
- * Only the two maintained report links are changed; report HTML and other links
- * are untouched. TypeDoc leaves navigationLinks relative to each current page.
+ * Only the maintained report and Rust API links are changed; report/Rustdoc HTML
+ * and other links are untouched. TypeDoc leaves navigationLinks relative to each current page.
  */
 export function wireReportLinks(site: string): void {
   function visit(directory: string): void {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = resolve(directory, entry.name);
-      if (entry.isDirectory() && entry.name !== "reports") visit(path);
+      // Report and Rustdoc pages are generated with their own correct relative links.
+      if (entry.isDirectory() && !(directory === site && ["reports", "rust"].includes(entry.name))) visit(path);
       else if (entry.isFile() && entry.name.endsWith(".html")) {
         const prefix = relative(dirname(path), site).replaceAll("\\", "/") || ".";
         const html = readFileSync(path, "utf8");
-        const linked = html.replace(/href="(?:\.\/|\.\.\/)*reports\/(unit|e2e)\/index\.html"/g,
-          (_match, section: string) => `href="${prefix}/reports/${section}/index.html"`);
+        const linked = html.replace(/href="(?:\.\/|\.\.\/)*(reports\/(?:unit|e2e)|rust\/omarkd_lib)\/index\.html"/g,
+          (_match, section: string) => `href="${prefix}/${section}/index.html"`);
         if (linked !== html) writeFileSync(path, linked);
       }
     }

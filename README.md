@@ -1,4 +1,4 @@
-# Omarkd
+<img src="./assets/omarkd-title.svg" width="100%" alt="OMARKD" />
 
 A lightweight Tauri 2 Markdown reader and editor, built with Bun, Rust, and plain TypeScript.
 
@@ -158,7 +158,7 @@ with the respective platform prerequisites installed.
 
 The icon combines an O monogram with a terminal prompt in mint and midnight blue.
 The editable vector source is [icon.svg](icon.svg), also used by the welcome screen
-and browser favicon. Desktop icon assets live in [src-tauri/icons](src-tauri/icons).
+and browser favicon. Desktop icon assets live in [src-tauri/icons](https://github.com/contd/omarkd/tree/main/src-tauri/icons).
 After editing the source, regenerate the platform icons with:
 
 ```sh
@@ -287,7 +287,7 @@ bun run test:coverage    # TypeScript coverage only; HTML report in coverage/
 bun run test:screenshots # run feature tests and refresh assets/screenshots/
 ```
 
-All unit tests live in [tests/](tests/), including the Rust tests loaded as
+All unit tests live in [tests/](https://github.com/contd/omarkd/tree/main/tests), including the Rust tests loaded as
 test-only modules from the backend. The suite covers paths and URL encoding,
 sanitization, theme persistence and synchronization, reader enhancements, the
 application controller, document loading and rendering, navigation policy,
@@ -301,7 +301,7 @@ Coverage checks apply to each TypeScript source file: 100% functions, at least
 guarantee of correctness. New features/functions need assertions for their
 behavior and failure paths, not just coverage.
 
-Playwright tests and fixtures live in [e2e/](e2e/). Before each run, a Cargo
+Playwright tests and fixtures live in [e2e/](https://github.com/contd/omarkd/tree/main/e2e). Before each run, a Cargo
 fixture builder uses the production Rust parser/highlighter to generate document
 HTML and CSS. Only Tauri desktop calls are replaced with a strict test bridge;
 unknown commands fail instead of silently succeeding. The suite uses its own
@@ -310,7 +310,7 @@ Vite server on port 1430, separate from the usual development port 1420.
 Each passing browser test attaches a screenshot to the Playwright report.
 Ordinary runs write disposable screenshots to `test-results/`, and failures
 retain screenshots and traces. Only `test:screenshots` updates the persistent
-PNG files in [assets/screenshots/](assets/screenshots/) used above. These are
+PNG files in [assets/screenshots/](https://github.com/contd/omarkd/tree/main/assets/screenshots) used above. These are
 documentation captures, not pixel-diff baselines. View the report with
 `bunx playwright show-report`.
 
@@ -337,29 +337,39 @@ Future test and screenshot requirements are recorded in [AGENTS.md](AGENTS.md).
 
 ## Source documentation
 
+The TypeDoc site uses this README as its home page (`"readme": "README.md"` in
+[typedoc.json](typedoc.json)); TypeDoc copies the linked screenshots and files into
+the site. Link folders with GitHub URLs because TypeDoc can only copy files.
 The TypeDoc site and its test-report landing pages use `icon.svg` as the favicon
 and as the logo beside the site title. TypeDoc copies the SVG into its generated
 assets; `docs/branding.css` styles the toolbar logo.
 
-Generate the project's TypeScript API and native Rust documentation with:
+The **Omarkd** docs site combines this README (home page), TypeDoc for the
+application, unit tests and Playwright tests, Rustdoc for the native code and Rust
+tests, and the full test reports. Generate it with:
 
 ```sh
-bun run docs              # API docs plus fresh unit/coverage and E2E reports
-npm run docs:ts           # TypeDoc for application and test modules
-npm run docs:rust         # Rustdoc, including private native modules and helpers
+bun run docs              # the complete site: TypeDoc, Rustdoc and fresh test reports
+npm run docs:ts           # TypeDoc for application, unit-test and E2E modules
+npm run docs:rust         # Rustdoc with private items and Rust tests, published into the site
 npm run docs:reports      # rerun tests and refresh both report sections after TypeDoc exists
 ```
 
-Open `docs/typedoc/index.html` for TypeDoc or
-`src-tauri/target/doc/omarkd_lib/index.html` for Rustdoc. Generated HTML is ignored
-by Git; the comments and generator configuration are the maintained sources.
+Run them in that order: TypeDoc replaces its whole output folder. Open
+`docs/typedoc/index.html` for the site; Rustdoc is published at
+`docs/typedoc/rust/omarkd_lib/index.html` with a header linking back to the site.
+Generated HTML is ignored by Git; the comments, `docs/rustdoc-header.html`, and
+generator configuration are the maintained sources.
 Run `bun install` first to install TypeDoc along with the other development tools.
 
 [typedoc.json](typedoc.json) expands `src/`, `tests/`, and `e2e/`, so new application
 and TypeScript test modules are included automatically. Test module pages describe
 suite scope and mocks; individual scenarios and helpers have inline documentation.
 Configuration scripts and ambient declarations are not API entry points.
-Rust unit tests carry corresponding Rustdoc comments in their source.
+Rust unit tests carry corresponding Rustdoc comments in their source. Rustdoc
+builds with `--cfg test` so the test modules appear, and each test uses
+`#[cfg_attr(not(doc), test)]` instead of `#[test]`, which Rust would otherwise remove
+outside the test harness; `cargo test` still runs every test.
 TypeDoc reads TSDoc-style `/** ... */`
 comments; Rustdoc reads `//!` module and `///` item documentation. TypeDoc does not
 parse Rust. The native files include detailed explanations of rendering, safe
@@ -441,8 +451,8 @@ rerun the failed jobs. Do not move a published tag.
 
 [Documentation automation](.github/workflows/pages.yml) also runs on pushes to
 `main` and can be started manually in Actions. It generates the site beneath
-`docs/typedoc/`, including fresh unit/coverage and browser reports, then copies
-Rustdoc into `docs/typedoc/rust/`. The generated folder is the Pages artifact root:
+`docs/typedoc/`, including Rustdoc in `docs/typedoc/rust/` and fresh
+unit/coverage and browser reports. The generated folder is the Pages artifact root:
 
 - [Project documentation](https://contd.github.io/omarkd/)
 - [Unit tests and coverage](https://contd.github.io/omarkd/reports/unit/)

@@ -65,7 +65,8 @@ it("escapes test output and renders complete passing/failing runs with artifact 
   expect(html).toContain('href="coverage/index.html"');
   expect(html).toContain('href="../../index.html"');
   expect(html).toContain('<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">');
-  expect(html).toContain('<img src="../../assets/favicon.svg" alt="">Omarkd TypeScript API');
+  expect(html).toContain('<img src="../../assets/favicon.svg" alt="">Omarkd</a>');
+  expect(html).toContain('<a href="../../rust/omarkd_lib/index.html">Rust API</a>');
 });
 
 /** Real copy operations must retain nested trace assets and never overwrite the API index. */
@@ -117,18 +118,22 @@ it("requires a generated TypeDoc site before starting any test runner", () => {
 });
 
 /** Report navigation must work from the index and nested pages, including repeated rebuilds. */
-it("rewrites only report links relative to each API page without touching copied report assets", () => {
+it("rewrites only report and Rust API links relative to each API page without touching copied report assets", () => {
   const root = project();
   const site = resolve(root, "docs/typedoc");
   mkdirSync(resolve(site, "modules"));
   mkdirSync(resolve(site, "reports"));
   writeFileSync(resolve(site, "index.html"), '<a href="./reports/unit/index.html">Unit</a>');
-  writeFileSync(resolve(site, "modules/reader.html"), '<a href="./reports/e2e/index.html">E2E</a><a href="../index.html">API</a>');
+  mkdirSync(resolve(site, "rust/omarkd_lib"), { recursive: true });
+  writeFileSync(resolve(site, "modules/reader.html"), '<a href="./reports/e2e/index.html">E2E</a><a href="./rust/omarkd_lib/index.html">Rust</a><a href="../index.html">API</a>');
   writeFileSync(resolve(site, "reports/keep.html"), '<a href="./reports/unit/index.html">untouched</a>');
+  writeFileSync(resolve(site, "rust/omarkd_lib/keep.html"), '<a href="./rust/omarkd_lib/index.html">untouched</a>');
   wireReportLinks(site);
   wireReportLinks(site);
   expect(readFileSync(resolve(site, "index.html"), "utf8")).toContain('href="./reports/unit/index.html"');
   expect(readFileSync(resolve(site, "modules/reader.html"), "utf8")).toContain('href="../reports/e2e/index.html"');
+  expect(readFileSync(resolve(site, "modules/reader.html"), "utf8")).toContain('href="../rust/omarkd_lib/index.html"');
+  expect(readFileSync(resolve(site, "rust/omarkd_lib/keep.html"), "utf8")).toContain('href="./rust/omarkd_lib/index.html"');
   expect(readFileSync(resolve(site, "modules/reader.html"), "utf8")).toContain('href="../index.html"');
   expect(readFileSync(resolve(site, "reports/keep.html"), "utf8")).toContain('href="./reports/unit/index.html"');
 });

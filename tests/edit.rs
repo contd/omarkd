@@ -6,7 +6,7 @@
 use super::*;
 
 /// Unicode, BOM and CRLF survive a save; no-op and empty-source saves remain valid.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn saves_utf8_atomically_and_keeps_newlines_bom_and_permissions() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("notes.md");
@@ -37,7 +37,7 @@ fn saves_utf8_atomically_and_keeps_newlines_bom_and_permissions() {
 /// External writes never get replaced until the supplied expected snapshot agrees.
 ///
 /// Changing disk twice proves an explicit overwrite still performs conflict detection.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn conflicts_never_overwrite_external_edits_and_explicit_resolution_rechecks() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("notes.md");
@@ -58,7 +58,7 @@ fn conflicts_never_overwrite_external_edits_and_explicit_resolution_rechecks() {
 }
 
 /// Missing paths, directories and invalid UTF-8 fail without creating/replacing files.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn rejects_missing_files_directories_and_invalid_utf8_without_writing() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("missing.md");
@@ -74,7 +74,7 @@ fn rejects_missing_files_directories_and_invalid_utf8_without_writing() {
 }
 
 /// Invalid paths and read-only permissions return errors while preserving original data.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn reports_write_errors_and_keeps_original_data() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("notes.md");

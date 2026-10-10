@@ -33,7 +33,7 @@ impl Drop for TempDirectory {
 }
 
 /// Relative paths use launch cwd; absolute/file-prefixed paths are retained and flags skipped.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn resolves_relative_absolute_and_file_url_args_and_skips_flags() {
     let tmp = TempDirectory::new();
     let absolute = tmp.0.join("absolute.md");
@@ -55,7 +55,7 @@ fn resolves_relative_absolute_and_file_url_args_and_skips_flags() {
 }
 
 /// README selection respects documented priority and empty directories contribute no document.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn directory_args_choose_readme_in_priority_order_and_skip_empty_directories() {
     let tmp = TempDirectory::new();
     assert!(resolve_args(vec![".".into()], &tmp.0).is_empty());
@@ -70,7 +70,7 @@ fn directory_args_choose_readme_in_priority_order_and_skip_empty_directories() {
 }
 
 /// Existing paths canonicalize while nonexistent paths remain available for useful read errors.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn normalizes_existing_paths_but_preserves_missing_paths() {
     let tmp = TempDirectory::new();
     std::fs::write(tmp.0.join("notes.md"), "# Notes").unwrap();
@@ -83,7 +83,7 @@ fn normalizes_existing_paths_but_preserves_missing_paths() {
 }
 
 /// Reader-mode lossy UTF-8 is deliberate; command metadata and JSON casing stay stable.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn loads_document_metadata_html_and_utf8_lossily() {
     let tmp = TempDirectory::new();
     let path = tmp.0.join("notes.md");
@@ -102,7 +102,7 @@ fn loads_document_metadata_html_and_utf8_lossily() {
 }
 
 /// Missing files and directory reads fail with path-qualified diagnostics.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn reports_missing_or_unreadable_documents() {
     let tmp = TempDirectory::new();
     let missing = tmp.0.join("missing.md");
@@ -112,7 +112,7 @@ fn reports_missing_or_unreadable_documents() {
 }
 
 /// App/asset origins are allowed; remote lookalikes and active schemes never navigate the webview.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn navigation_allows_only_internal_urls_and_debug_loopback() {
     for url in [
         "tauri://localhost/index.html",
@@ -141,7 +141,7 @@ fn navigation_allows_only_internal_urls_and_debug_loopback() {
 }
 
 /// Fresh managed state has no resource handles, pending quits or exit authorization.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn app_state_starts_empty() {
     let state = AppState::default();
     assert!(state.documents.lock().unwrap().is_empty());
@@ -152,7 +152,7 @@ fn app_state_starts_empty() {
 }
 
 /// Exit requires all current windows; unknown, stale and duplicate replies cannot cancel or finish it.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn quit_requires_every_window_and_ignores_stale_or_duplicate_responses() {
     let mut request = Some(QuitRequest {
         id: 2,
@@ -168,7 +168,7 @@ fn quit_requires_every_window_and_ignores_stale_or_duplicate_responses() {
 }
 
 /// A participating failure cancels Quit and late success cannot resurrect its exit authorization.
-#[test]
+#[cfg_attr(not(doc), test)]
 fn one_failed_save_cancels_quit_and_late_success_cannot_exit() {
     let mut request = Some(QuitRequest {
         id: 3,

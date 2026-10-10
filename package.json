@@ -35,7 +35,7 @@
     "uninstall:cli": "sh scripts/uninstall-cli.sh",
     "docs": "bun run docs:ts && bun run docs:rust && bun run docs:reports",
     "docs:ts": "typedoc",
-    "docs:rust": "cargo doc --manifest-path src-tauri/Cargo.toml --lib --no-deps --document-private-items",
+    "docs:rust": "bun scripts/rust-docs.ts",
     "docs:reports": "bun scripts/test-reports.ts",
     "test": "bun run test:unit && bun run test:e2e",
     "test:unit": "vitest run --coverage && bun run test:rust",
@@ -63,12 +63,15 @@
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "@tauri-apps/cli": "^2",
-    "@types/node": "^22",
+    "@types/node": "^22.20.5",
     "@vitest/coverage-v8": "^3.2.0",
     "jsdom": "^26.1.0",
-    "typescript": "~5.6.2",
     "typedoc": "^0.28.0",
+    "typescript": "~5.6.2",
     "vite": "^6.0.3",
     "vitest": "^3.2.0"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }
