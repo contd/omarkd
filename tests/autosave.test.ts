@@ -1,10 +1,18 @@
+/**
+ * Autosave state-machine tests with deterministic fake time and controllable writes.
+ * Native I/O is replaced at the writer callback; Rust tests cover actual file saves.
+ * Assertions protect debounce boundaries, draft retention and stale-read rejection.
+ * @packageDocumentation
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Autosave, type SaveResult } from "../src/autosave";
 
+// No wall-clock sleeps: advancing 299/300 ms verifies the exact debounce contract.
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe("autosave queue", () => {
+  /** Two edits within one debounce window produce exactly one write of the latest text. */
   it("debounces changes and saves the latest draft", async () => {
     const write = vi.fn().mockResolvedValue({ kind: "saved" });
     const notify = vi.fn();
@@ -22,6 +30,7 @@ describe("autosave queue", () => {
     expect(await save.flush()).toBe(true);
   });
 
+  /** Hold the first write open; concurrent flush callers must share the queue and save the newer draft. */
   it("serializes in-flight changes and drains every newer draft before leaving", async () => {
     let finish!: (result: SaveResult) => void;
     const write = vi.fn().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
@@ -39,6 +48,7 @@ describe("autosave queue", () => {
     expect(save.unsaved).toBe(false);
   });
 
+  /** Repeated external changes require repeated decisions, never an unchecked force overwrite. */
   it("pauses on conflict, preserves later edits, and rechecks an explicit overwrite", async () => {
     const write = vi.fn().mockResolvedValueOnce({ kind: "conflict", source: "external" })
       .mockResolvedValueOnce({ kind: "conflict", source: "external-new" })
@@ -56,6 +66,7 @@ describe("autosave queue", () => {
     expect(write.mock.calls[2]).toEqual(["external-new", "my-new-edits"]);
   });
 
+  /** Simulate permission failure; retry resumes explicitly and discard cancels its pending timer. */
   it("surfaces errors, pauses automatic retries, and supports retry and discard", async () => {
     const write = vi.fn().mockRejectedValueOnce(new Error("read only")).mockResolvedValue({ kind: "saved" });
     const save = new Autosave("original", write, vi.fn());
@@ -76,6 +87,7 @@ describe("autosave queue", () => {
     expect(save.state).toEqual({ kind: "error", message: "read error" });
   });
 
+  /** Disk updates can replace clean text, but dirty drafts become conflicts and stay local. */
   it("reconciles external edits only when the draft is clean", async () => {
     const save = new Autosave("original", vi.fn().mockResolvedValue({ kind: "saved" }), vi.fn());
     expect(await save.reconcile("original")).toBe(false);
@@ -87,6 +99,7 @@ describe("autosave queue", () => {
     expect(save.source).toBe("mine");
   });
 
+  /** A watcher snapshot from our own in-flight save must not be applied as a new external document. */
   it("waits for a pending save before reconciling its watcher event", async () => {
     let finish!: (result: SaveResult) => void;
     const save = new Autosave("original", () => new Promise(resolve => { finish = resolve; }), vi.fn());
@@ -99,6 +112,7 @@ describe("autosave queue", () => {
     expect(save.unsaved).toBe(false);
   });
 
+  /** Undo back to the acknowledged base is a no-op, not another disk write. */
   it("does not write unchanged text and handles undoing changes", async () => {
     const write = vi.fn();
     const save = new Autosave("original", write, vi.fn());
@@ -108,6 +122,7 @@ describe("autosave queue", () => {
     expect(write).not.toHaveBeenCalled();
   });
 
+  /** Revision tokens make delayed reads harmless both before and after a newer draft is saved. */
   it("does not apply disk snapshots taken before a newer edit or save", async () => {
     const save = new Autosave("original", vi.fn().mockResolvedValue({ kind: "saved" }), vi.fn());
     const revision = save.revision;

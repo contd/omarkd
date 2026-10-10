@@ -175,11 +175,32 @@ omarkd one.md two.md
 omarkd .                       # opens the directory's README
 ```
 
-The installer links `bin/omarkd` into `/usr/local/bin` if writable, or
-`~/.local/bin` otherwise. For a custom location:
+The installer previews the source launcher, destination, replacement of an
+existing command, and PATH requirements, then asks for confirmation before making
+any changes. With [Gum](https://github.com/charmbracelet/gum) installed, a menu offers
+`~/.local/bin`, `/usr/local/bin`, or a custom directory, followed by a confirmation
+dialog that defaults to No. Without Gum, it selects `/usr/local/bin` if writable
+or `~/.local/bin` otherwise, prints the plan, and asks for a typed confirmation.
+Answer `y` or `yes` to proceed; declining or ending input makes no changes.
+It does not use sudo or modify your shell configuration.
+
+Pass a custom location to skip the destination menu (confirmation still applies):
 
 ```sh
 sh scripts/install-cli.sh "$HOME/bin"
+```
+
+Uninstall the command with `npm run uninstall:cli` (or `bun run uninstall:cli`).
+The uninstaller detects launcher symlinks for this checkout in PATH,
+`~/.local/bin`, and `/usr/local/bin`, previews all detected links, and asks for
+confirmation with Gum when available or a typed `y/yes` otherwise. Both default
+to No; cancellation or EOF makes no changes. It removes only those symlinks,
+keeping the app, checkout, documents, directories, and shell configuration.
+Regular files and launcher links to other checkouts are not removed.
+For a custom installation outside PATH, specify the directory:
+
+```sh
+npm run uninstall:cli -- "$HOME/bin"
 ```
 
 You can also use `./bin/omarkd examples/showcase.md` without installing.
@@ -313,3 +334,65 @@ also launch `bun run app:dev -- examples/showcase.md` and verify:
 - On macOS, closing all windows keeps the app resident and **Quit** exits.
 
 Future test and screenshot requirements are recorded in [AGENTS.md](AGENTS.md).
+
+## Source documentation
+
+The TypeDoc site and its test-report landing pages use `icon.svg` as the favicon
+and as the logo beside the site title. TypeDoc copies the SVG into its generated
+assets; `docs/branding.css` styles the toolbar logo.
+
+Generate the project's TypeScript API and native Rust documentation with:
+
+```sh
+bun run docs              # API docs plus fresh unit/coverage and E2E reports
+npm run docs:ts           # TypeDoc for application and test modules
+npm run docs:rust         # Rustdoc, including private native modules and helpers
+npm run docs:reports      # rerun tests and refresh both report sections after TypeDoc exists
+```
+
+Open `docs/typedoc/index.html` for TypeDoc or
+`src-tauri/target/doc/omarkd_lib/index.html` for Rustdoc. Generated HTML is ignored
+by Git; the comments and generator configuration are the maintained sources.
+Run `bun install` first to install TypeDoc along with the other development tools.
+
+[typedoc.json](typedoc.json) expands `src/`, `tests/`, and `e2e/`, so new application
+and TypeScript test modules are included automatically. Test module pages describe
+suite scope and mocks; individual scenarios and helpers have inline documentation.
+Configuration scripts and ambient declarations are not API entry points.
+Rust unit tests carry corresponding Rustdoc comments in their source.
+TypeDoc reads TSDoc-style `/** ... */`
+comments; Rustdoc reads `//!` module and `///` item documentation. TypeDoc does not
+parse Rust. The native files include detailed explanations of rendering, safe
+saves, command authorization, resource ownership and window/Quit coordination.
+Regenerate documentation when changing the corresponding APIs; TypeDoc warnings
+are treated as errors.
+
+### Full test reports
+
+The docs site's navigation includes **Unit tests & coverage** and
+**Playwright E2E results**. `bun run docs` generates the API pages first, then
+runs fresh Vitest coverage, Rust tests, and Playwright tests. These report sections
+are not hand-maintained summaries:
+
+- **Unit tests & coverage:** complete verbose Vitest output and Rust test output,
+  exit statuses, timestamps, full Vitest JSON results, and the interactive per-file
+  coverage report including source-line highlighting.
+- **Playwright E2E results:** complete runner output plus the original Playwright
+  HTML report, with individual test results, steps and attached feature screenshots.
+  Failed runs retain their failure screenshots and traces when Playwright produces them.
+
+Reports live under `docs/typedoc/reports/` and are ignored along with the generated
+API site. Report generation publishes failure output and returns a nonzero exit
+status when a runner fails or a required report is missing. Every run uses fresh
+temporary artifact directories to avoid presenting stale results as current.
+Documentation E2E runs use a separate Vite server on port 1431 and their own
+Playwright artifact directory, leaving ordinary port-1430 test runs isolated.
+Ordinary report generation does not overwrite `assets/screenshots/`; intentional
+README updates still require `bun run test:screenshots`.
+
+Regenerating TypeDoc alone replaces its output and removes the embedded reports;
+use `bun run docs` for a complete site or follow `docs:ts` with `docs:reports`.
+Serve `docs/typedoc/` over local HTTP to use all interactive report features;
+some Playwright/trace features may not work from a `file://` page. Share or publish
+test artifacts only after checking logs and source coverage for private paths or
+document contents. A browser bridge does not verify the native OS smoke checks.

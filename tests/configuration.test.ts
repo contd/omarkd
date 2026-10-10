@@ -1,11 +1,19 @@
 // @vitest-environment node
+/**
+ * Static desktop/configuration contracts and screenshot-gallery integrity.
+ * Reads manifests and PNG headers; it does not launch native OS integrations.
+ * Broken or unreferenced persistent screenshots fail rather than silently disappearing.
+ * @packageDocumentation
+ */
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+/** Reads a repository-relative JSON manifest; malformed/missing files fail the test. */
 const readJson = (path: string) => JSON.parse(readFileSync(resolve(path), "utf8"));
 
 describe("desktop integration configuration", () => {
+  /** Native associations and icon paths must remain compatible with the desktop bundle. */
   it("registers Markdown document associations and valid generated icons", () => {
     const config = readJson("src-tauri/tauri.conf.json");
     expect(config.productName).toBe("Omarkd");
@@ -17,6 +25,7 @@ describe("desktop integration configuration", () => {
     for (const path of config.bundle.icon) expect(existsSync(resolve("src-tauri", path))).toBe(true);
   });
 
+  /** Check capability scope and required permissions, not the success of real desktop APIs. */
   it("grants the reader's native commands only to document windows", () => {
     const capability = readJson("src-tauri/capabilities/default.json");
     expect(capability.windows).toEqual(["doc-*"]);
@@ -28,6 +37,7 @@ describe("desktop integration configuration", () => {
     expect(capability.permissions).toContainEqual({ identifier: "opener:allow-open-path", allow: [{ path: "**" }] });
   });
 
+  /** App assets/renderers remain allowed while frames and embedded objects remain forbidden. */
   it("keeps the content security policy restrictive while allowing local renderers and images", () => {
     const { csp, assetProtocol } = readJson("src-tauri/tauri.conf.json").app.security;
     expect(csp["script-src"]).toBe("'self'");
@@ -37,6 +47,7 @@ describe("desktop integration configuration", () => {
     expect(assetProtocol.enable).toBe(true);
   });
 
+  /** Every README capture must be a sufficiently sized PNG and every stored PNG must be referenced. */
   it("uses every persistent feature screenshot in the README without broken image links", () => {
     const readme = readFileSync("README.md", "utf8");
     const paths = [...readme.matchAll(/\]\((assets\/screenshots\/[^)]+)\)/g)].map(match => match[1]);

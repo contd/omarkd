@@ -1,9 +1,16 @@
+//! Production Comrak/Syntect rendering tests, loaded through render's path module.
+//!
+//! HTML assertions cover parser extensions, frontend marker contracts, escaping,
+//! local asset paths and palette scoping. No browser engines or mocked parser are
+//! used; E2E subsequently verifies this real output in the actual frontend.
 use super::*;
 
+/// CommonMark/GFM constructs must yield expected markup, stable headings and emoji.
 #[test]
 fn renders_commonmark_and_github_features() {
     let html = render_markdown("# Title\n\n**bold** *italic* ~~strike~~ `inline` ^sup^\n\nhttps://example.com :rocket:\n\n- [x] done\n- [ ] todo\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n> [!NOTE]\n> notice\n", None);
     for expected in [
+        // Individually listed fragments identify which parser extension regressed.
         "id=\"title\"",
         "<strong>bold</strong>",
         "<em>italic</em>",
@@ -20,6 +27,7 @@ fn renders_commonmark_and_github_features() {
     }
 }
 
+/// Definition lists, wiki links, footnotes and embedded details survive; front matter stays hidden.
 #[test]
 fn renders_extended_features_and_hides_front_matter() {
     let html = render_markdown("---\nsecret: hidden\n---\n# Hello\n\nTerm\n: Definition\n\n[[second.md|Second]]\n\nFootnote[^one].\n\n[^one]: Footnote body.\n\n<details><summary>More</summary>Content</details>\n", None);
@@ -38,6 +46,7 @@ fn renders_extended_features_and_hides_front_matter() {
     assert!(!html.contains("secret: hidden"));
 }
 
+/// Math stays marked for Temml, and Mermaid source is escaped rather than interpreted as HTML.
 #[test]
 fn emits_math_markers_and_escaped_mermaid_source() {
     let html = render_markdown("$x^2$\n\n$$x+y$$\n\n```math\n\\frac{1}{2}\n```\n\n```mermaid\ngraph TD; A[\"<script>&\"]-->B;\n```\n", None);
@@ -48,9 +57,11 @@ fn emits_math_markers_and_escaped_mermaid_source() {
     assert!(!html.contains("<script>"));
 }
 
+/// Extended language definitions produce class-based highlighting without fixed inline colors.
 #[test]
 fn highlights_extended_languages_without_inline_styles() {
     warm_up();
+    // These exercise the shared cached highlighter, including two-face's TypeScript syntax.
     for (lang, code) in [
         ("rust", "fn main() {}"),
         ("typescript", "const greet = (name: string) => name;"),
@@ -70,6 +81,7 @@ fn highlights_extended_languages_without_inline_styles() {
     }
 }
 
+/// Unknown fence languages are escaped readable code; an empty document renders no markup.
 #[test]
 fn unknown_languages_and_empty_documents_remain_readable() {
     let html = render_markdown("```unknown-omarkd-language\n<hello>&world\n```", None);
@@ -77,6 +89,7 @@ fn unknown_languages_and_empty_documents_remain_readable() {
     assert_eq!(render_markdown("", None), "");
 }
 
+/// Relative/local images use Tauri assets while remote, fragment and data URLs remain unchanged.
 #[test]
 fn rewrites_document_relative_images_and_preserves_external_urls() {
     let rewrite = ImageRewriter {
@@ -98,10 +111,12 @@ fn rewrites_document_relative_images_and_preserves_external_urls() {
         assert_eq!(rewrite.to_html(url), url);
     }
     let html = render_markdown("![img](<pics/a b.png>)", Some(Path::new("/tmp/docs")));
+    // Verify both the adapter and its wiring into a complete Markdown render.
     assert!(html.contains(&asset_url("/tmp/docs/pics/a b.png")));
     assert!(render_markdown("![img](pic.png)", None).contains("src=\"pic.png\""));
 }
 
+/// Scheme classification must not treat Windows drive letters as an external URL scheme.
 #[test]
 fn detects_schemes_and_not_windows_drives() {
     for url in [
@@ -121,6 +136,7 @@ fn detects_schemes_and_not_windows_drives() {
     }
 }
 
+/// UTF-8 and reserved bytes round-trip; malformed escapes are retained and invalid bytes decode lossily.
 #[test]
 fn percent_encoding_roundtrips_unicode_spaces_and_reserved_characters() {
     for text in ["", "plain-_.~123", "/a b/#%?&", "café/文.md"] {
@@ -131,6 +147,7 @@ fn percent_encoding_roundtrips_unicode_spaces_and_reserved_characters() {
     assert_eq!(percent_decode("%FF"), "\u{fffd}");
 }
 
+/// HTML-significant characters are escaped while ordinary apostrophes/text stay readable.
 #[test]
 fn escapes_html_metacharacters() {
     let mut output = String::new();
@@ -138,6 +155,7 @@ fn escapes_html_metacharacters() {
     assert_eq!(output, "&lt;&gt;&amp;&quot;' text");
 }
 
+/// Every generated selector is palette-scoped; manual app themes do not depend on media queries.
 #[test]
 fn css_has_both_themes_with_every_selector_scoped() {
     let css = highlight_css();
@@ -145,6 +163,7 @@ fn css_has_both_themes_with_every_selector_scoped() {
     assert!(css.contains(":where(:root[data-theme=\"dark\"]) .sx-code"));
     assert!(!css.contains("prefers-color-scheme"));
     for line in css.lines().filter(|line| line.ends_with(" {")) {
+        // A comma list must scope every member, not only its first selector.
         for selector in line.trim_end_matches(" {").split(", ") {
             assert!(
                 selector.starts_with(":where(:root[data-theme="),
@@ -154,6 +173,7 @@ fn css_has_both_themes_with_every_selector_scoped() {
     }
 }
 
+/// Selector-list and descendant formatting stays exact, with declarations preserved unchanged.
 #[test]
 fn scopes_highlight_selector_lists_and_descendants() {
     assert_eq!(

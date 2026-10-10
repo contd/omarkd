@@ -2,6 +2,7 @@ import { test, expect } from "./bridge";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
+/** Captures a stable, font-ready editor state and attaches it to this test's report. */
 async function capture(page: Page) {
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -14,10 +15,12 @@ async function capture(page: Page) {
   await test.info().attach("Feature screenshot", { path, contentType: "image/png" });
 }
 
+// The two mode/conflict cases capture their informative intermediate state explicitly.
 test.afterEach(async ({ page }, info) => {
   if (info.status === "passed" && !["edit-mode-autosave", "edit-mode-conflict"].includes(info.title)) await capture(page);
 });
 
+/** Opens the reader fixture, waits for loading, then enters the real Markdown textbox. */
 async function enter(page: Page) {
   await page.goto("/?file=/documents/reader.md");
   await expect(page.locator("#doc-path")).toHaveText("/documents/reader.md");
@@ -25,6 +28,7 @@ async function enter(page: Page) {
   await expect(page.getByRole("textbox", { name: "Markdown editor" })).toBeVisible();
 }
 
+/** Typing saves without leaving; switching to View renders the same saved Rust-produced content. */
 test("edit-mode-autosave", async ({ page }) => {
   await enter(page);
   await expect(page.locator(".cm-lineNumbers")).toBeVisible();
@@ -41,6 +45,7 @@ test("edit-mode-autosave", async ({ page }) => {
   await expect(page.locator("#content strong")).toHaveText("Saved automatically");
 });
 
+/** An outside write blocks leaving and preserves disk until explicit overwrite is selected. */
 test("edit-mode-conflict", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => { window.omarkdTest.documents["/documents/reader.md"].source = "# External change"; });
@@ -56,6 +61,7 @@ test("edit-mode-conflict", async ({ page }) => {
   await expect(page.locator("#content h1")).toHaveText("My unsaved edits");
 });
 
+/** Simulated permission failure keeps the editor mounted; retry recovery enables safe View transition. */
 test("editor-save-failure-and-retry", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => { window.omarkdTest.saveError = "Permission denied"; });
@@ -70,6 +76,7 @@ test("editor-save-failure-and-retry", async ({ page }) => {
   await expect(page.locator("#content h1")).toHaveText("Kept locally");
 });
 
+/** Immediate View clicks disable the toggle and wait for the delayed native save acknowledgment. */
 test("editor-view-waits-for-pending-save", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => { window.omarkdTest.saveDelay = 500; });
@@ -81,6 +88,7 @@ test("editor-view-waits-for-pending-save", async ({ page }) => {
   await expect(page.locator("#editor-panel")).toBeHidden();
 });
 
+/** Watcher events replace clean text, while a conflict requires explicit discard to load newer disk text. */
 test("editor-external-reload-and-discard", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => {
@@ -96,6 +104,7 @@ test("editor-external-reload-and-discard", async ({ page }) => {
   await expect(page.locator("#status")).toHaveText("Saved");
 });
 
+/** Theme CSS/search belong to CodeMirror in edit mode; reader find/outline controls must not interfere. */
 test("editor-theme-and-find", async ({ page }) => {
   await enter(page);
   await page.getByRole("button", { name: "Dark mode" }).click();
@@ -108,6 +117,7 @@ test("editor-theme-and-find", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Toggle outline" })).toBeDisabled();
 });
 
+/** Edits during a delayed save form ordered writes with correct expected bases; undo/redo remains usable. */
 test("editor-undo-and-serialized-saves", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => { window.omarkdTest.saveDelay = 600; });
@@ -125,6 +135,7 @@ test("editor-undo-and-serialized-saves", async ({ page }) => {
   await expect(text).toHaveText("# Latest save");
 });
 
+/** A failed save prevents both current-window navigation and extra windows from a multi-file dialog. */
 test("editor-navigation-save-guard", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => {
@@ -144,6 +155,7 @@ test("editor-navigation-save-guard", async ({ page }) => {
   expect(await page.evaluate(() => window.omarkdTest.documents["/documents/reader.md"].source)).toBe("# Unsaved navigation draft");
 });
 
+/** Native Quit API wiring acknowledges failure/success correctly; actual OS Quit requires smoke testing. */
 test("editor-quit-save-guard", async ({ page }) => {
   await enter(page);
   await page.evaluate(() => { window.omarkdTest.saveError = "Cannot write"; });
@@ -160,6 +172,7 @@ test("editor-quit-save-guard", async ({ page }) => {
   await expect(page.locator("#editor-panel")).toBeHidden();
 });
 
+/** Minimum-width layout keeps line numbers, wrapping and top-right controls within the viewport. */
 test("editor-compact-window", async ({ page }) => {
   await page.setViewportSize({ width: 420, height: 740 });
   await page.goto("/");
@@ -171,3 +184,10 @@ test("editor-compact-window", async ({ page }) => {
   expect(theme!.x + theme!.width).toBeLessThanOrEqual(420);
   expect(await page.locator(".cm-scroller").evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
+/**
+ * User-facing editor tests running actual CodeMirror and the production frontend.
+ * The native bridge supplies controlled disk conflicts/delays but uses Rust for
+ * Markdown rendering. Assertions cover saved source and UI together.
+ * Screenshot captures attach to reports; only explicit screenshot mode updates README assets.
+ * @packageDocumentation
+ */

@@ -1,0 +1,13 @@
+.tsd-page-toolbar a.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tsd-page-toolbar a.title::before {
+  content: "";
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  background: url("./favicon.svg") center / contain no-repeat;
+}

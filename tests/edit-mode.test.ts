@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/** Command seam installed before module imports so source reads/saves remain deterministic. */
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
+/** Editor controls record lifecycle calls; the creation callback simulates user typing. */
 const editor = vi.hoisted(() => ({
   create: vi.fn(), destroy: vi.fn(), replace: vi.fn(), setTheme: vi.fn(), find: vi.fn(), closeFind: vi.fn(), focus: vi.fn(),
 }));
@@ -9,6 +11,7 @@ vi.mock("../src/theme", () => ({ getTheme: () => "dark" }));
 vi.mock("../src/text-editor", () => ({ createTextEditor: editor.create }));
 import { EditMode } from "../src/edit-mode";
 
+// Every case starts with a clean DOM, successful source/save defaults and fake debounce time.
 beforeEach(() => {
   vi.resetAllMocks();
   vi.useFakeTimers();
@@ -24,11 +27,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+/** Mounts a controller and exposes typed-text and delegated-banner-action drivers. */
 function setup() {
   const status = document.getElementById("status")!;
   const message = document.getElementById("message")!;
   const changed = vi.fn();
   const mode = new EditMode(document.getElementById("host")!, message, document.getElementById("edit") as HTMLButtonElement, status, changed);
+  // Drive the callback handed to the editor, rather than bypassing the save queue.
   const change = (source: string) => editor.create.mock.calls.at(-1)![3](source);
   const action = async (name: string) => {
     message.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!.click();
@@ -38,6 +43,7 @@ function setup() {
 }
 
 describe("edit mode", () => {
+  /** Entry is idempotent; leaving flushes changes before destroying the mounted editor. */
   it("opens lazily, updates theme and find, saves before viewing and destroys the editor", async () => {
     const { mode, status, changed, change } = setup();
     expect(await mode.save()).toBe(true);
@@ -63,6 +69,7 @@ describe("edit mode", () => {
     expect(changed).toHaveBeenCalledTimes(2);
   });
 
+  /** Conflict banners must retain copyable local text and use the disk snapshot on explicit overwrite. */
   it("keeps unsaved text and blocks leaving until a conflict is explicitly resolved", async () => {
     const { mode, change, action, message } = setup();
     await mode.enter("/docs/a.md");
@@ -79,6 +86,7 @@ describe("edit mode", () => {
     expect(await mode.leave()).toBe(true);
   });
 
+  /** Discard reads the latest disk source, not the potentially older conflict message snapshot. */
   it("allows explicit discard and replaces the editor with fresh disk contents", async () => {
     const { mode, change, action } = setup();
     await mode.enter("/docs/a.md");
@@ -91,6 +99,7 @@ describe("edit mode", () => {
     expect(mode.unsaved).toBe(false);
   });
 
+  /** Both native UTF-8 errors and editor-construction exceptions must roll back active mode. */
   it("shows read and editor creation failures without enabling edit mode", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const { mode, status, message } = setup();
@@ -105,6 +114,7 @@ describe("edit mode", () => {
     expect(log).toHaveBeenCalledTimes(2);
   });
 
+  /** A failed write blocks leaving until retry succeeds; the warning then disappears. */
   it("shows errors and supports retry while preserving text", async () => {
     const { mode, change, action, message } = setup();
     await mode.enter("/docs/a.md");
@@ -117,6 +127,7 @@ describe("edit mode", () => {
     expect(message.hidden).toBe(true);
   });
 
+  /** Clean external updates reload; a later deletion becomes a visible blocking save state. */
   it("refreshes clean external changes and pauses saves when source cannot be read", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { mode, message } = setup();
@@ -130,6 +141,7 @@ describe("edit mode", () => {
     expect(await mode.leave()).toBe(false);
   });
 
+  /** A watcher-triggered refresh must not replace dirty local source after a conflict reply. */
   it("does not replace local edits with an external conflict", async () => {
     const { mode, change } = setup();
     await mode.enter("/docs/a.md");
@@ -141,6 +153,7 @@ describe("edit mode", () => {
     expect(mode.unsaved).toBe(true);
   });
 
+  /** Hold the initial read unresolved to prove overlapping transitions cannot mount a second editor. */
   it("guards simultaneous entry, leaving and refresh while the editor is loading", async () => {
     let read!: (source: string) => void;
     const { mode } = setup();
@@ -154,6 +167,7 @@ describe("edit mode", () => {
     expect(editor.create).toHaveBeenCalledOnce();
   });
 
+  /** Delegated clicks require an active session; clipboard failures remain visible and logged. */
   it("reports action errors and ignores non-actions or actions without a session", async () => {
     const { mode, change, message, action, status } = setup();
     message.innerHTML = '<button data-action="copy">Copy</button>';
@@ -169,6 +183,7 @@ describe("edit mode", () => {
     expect(status.textContent).toContain("clipboard blocked");
   });
 
+  /** Session identity and revision checks reject stale reads without altering reader status or newer text. */
   it("ignores delayed source reads after leaving or after a newer edit", async () => {
     const { mode, change, status } = setup();
     await mode.enter("/docs/a.md");
@@ -196,3 +211,9 @@ describe("edit mode", () => {
     expect(status.textContent).toBe("Saved");
   });
 });
+/**
+ * Edit-mode controller tests using real DOM banners and a mocked CodeMirror facade.
+ * Native command replies are controlled per scenario, while the real Autosave
+ * queue determines whether leaving is allowed. No desktop files are modified.
+ * @packageDocumentation
+ */

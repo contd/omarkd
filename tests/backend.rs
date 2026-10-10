@@ -1,9 +1,18 @@
+//! Native helper tests for argument resolution, document metadata and Quit state.
+//!
+//! These exercise real filesystem reads and pure state helpers, not a running
+//! Tauri event loop. Desktop window, Finder and single-instance integrations still
+//! need the README's separate native smoke checks.
 use super::*;
 
+/// Owned temporary directory; Drop removes only this case's allocated filesystem tree.
 struct TempDirectory(PathBuf);
 
+/// Creates isolated files used by argument, normalization and rendering assertions.
 impl TempDirectory {
+    /// Allocates a process/counter-qualified directory so parallel tests cannot collide.
     fn new() -> Self {
+        /// Per-process sequence avoids reusing a directory between cases.
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "omarkd-tests-{}-{}",
@@ -15,12 +24,15 @@ impl TempDirectory {
     }
 }
 
+/// Ensures native fixtures are cleaned after success, failure or unwinding.
 impl Drop for TempDirectory {
+    /// Deletes the specifically allocated directory, never the repository or user home.
     fn drop(&mut self) {
         std::fs::remove_dir_all(&self.0).unwrap();
     }
 }
 
+/// Relative paths use launch cwd; absolute/file-prefixed paths are retained and flags skipped.
 #[test]
 fn resolves_relative_absolute_and_file_url_args_and_skips_flags() {
     let tmp = TempDirectory::new();
@@ -42,11 +54,13 @@ fn resolves_relative_absolute_and_file_url_args_and_skips_flags() {
     assert!(resolve_args(Vec::<String>::new(), &tmp.0).is_empty());
 }
 
+/// README selection respects documented priority and empty directories contribute no document.
 #[test]
 fn directory_args_choose_readme_in_priority_order_and_skip_empty_directories() {
     let tmp = TempDirectory::new();
     assert!(resolve_args(vec![".".into()], &tmp.0).is_empty());
     for name in ["index.md", "README.markdown", "README.md"] {
+        // Add successively higher-priority names to verify selection, not iteration order alone.
         std::fs::write(tmp.0.join(name), "# Readme").unwrap();
         assert_eq!(
             resolve_args(vec![".".into()], &tmp.0),
@@ -55,6 +69,7 @@ fn directory_args_choose_readme_in_priority_order_and_skip_empty_directories() {
     }
 }
 
+/// Existing paths canonicalize while nonexistent paths remain available for useful read errors.
 #[test]
 fn normalizes_existing_paths_but_preserves_missing_paths() {
     let tmp = TempDirectory::new();
@@ -67,6 +82,7 @@ fn normalizes_existing_paths_but_preserves_missing_paths() {
     assert_eq!(normalize(&missing), missing);
 }
 
+/// Reader-mode lossy UTF-8 is deliberate; command metadata and JSON casing stay stable.
 #[test]
 fn loads_document_metadata_html_and_utf8_lossily() {
     let tmp = TempDirectory::new();
@@ -80,10 +96,12 @@ fn loads_document_metadata_html_and_utf8_lossily() {
     assert!(doc.html.contains('\u{fffd}'));
     assert!(doc.render_ms.is_finite() && doc.render_ms >= 0.0);
     let json = serde_json::to_value(&doc).unwrap();
+    // Exactly five fields and renderMs casing define the frontend command contract.
     assert!(json.get("renderMs").is_some());
     assert_eq!(json.as_object().unwrap().len(), 5);
 }
 
+/// Missing files and directory reads fail with path-qualified diagnostics.
 #[test]
 fn reports_missing_or_unreadable_documents() {
     let tmp = TempDirectory::new();
@@ -93,6 +111,7 @@ fn reports_missing_or_unreadable_documents() {
     assert!(load_document(&tmp.0).is_err());
 }
 
+/// App/asset origins are allowed; remote lookalikes and active schemes never navigate the webview.
 #[test]
 fn navigation_allows_only_internal_urls_and_debug_loopback() {
     for url in [
@@ -113,6 +132,7 @@ fn navigation_allows_only_internal_urls_and_debug_loopback() {
         assert!(!is_allowed_navigation(&url.parse().unwrap()), "{url}");
     }
     for url in ["http://localhost:1420", "http://127.0.0.1:1420"] {
+        // Loopback is development-only; this expectation also holds in release-mode tests.
         assert_eq!(
             is_allowed_navigation(&url.parse().unwrap()),
             cfg!(debug_assertions)
@@ -120,6 +140,7 @@ fn navigation_allows_only_internal_urls_and_debug_loopback() {
     }
 }
 
+/// Fresh managed state has no resource handles, pending quits or exit authorization.
 #[test]
 fn app_state_starts_empty() {
     let state = AppState::default();
@@ -130,6 +151,7 @@ fn app_state_starts_empty() {
     assert!(!state.exit_ready.load(Ordering::Relaxed));
 }
 
+/// Exit requires all current windows; unknown, stale and duplicate replies cannot cancel or finish it.
 #[test]
 fn quit_requires_every_window_and_ignores_stale_or_duplicate_responses() {
     let mut request = Some(QuitRequest {
@@ -145,6 +167,7 @@ fn quit_requires_every_window_and_ignores_stale_or_duplicate_responses() {
     assert!(!acknowledge_quit(&mut request, 2, "second", true));
 }
 
+/// A participating failure cancels Quit and late success cannot resurrect its exit authorization.
 #[test]
 fn one_failed_save_cancels_quit_and_late_success_cannot_exit() {
     let mut request = Some(QuitRequest {

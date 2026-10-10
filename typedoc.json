@@ -1,0 +1,23 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "Omarkd TypeScript API",
+  "entryPoints": ["src", "tests", "e2e"],
+  "entryPointStrategy": "expand",
+  "exclude": ["**/*.d.ts"],
+  "tsconfig": "tsconfig.tests.json",
+  "out": "docs/typedoc",
+  "readme": "none",
+  "favicon": "icon.svg",
+  "customCss": "docs/branding.css",
+  "navigationLinks": {
+    "Unit tests & coverage": "./reports/unit/index.html",
+    "Playwright E2E results": "./reports/e2e/index.html"
+  },
+  "disableSources": true,
+  "treatWarningsAsErrors": true,
+  "validation": {
+    "invalidLink": true,
+    "notExported": true
+  },
+  "intentionallyNotExported": ["Theme"]
+}

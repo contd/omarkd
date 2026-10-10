@@ -1,3 +1,7 @@
+/**
+ * Lightweight CodeMirror Markdown editor, lazily imported on entering edit mode.
+ * @packageDocumentation
+ */
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
@@ -6,6 +10,16 @@ import { markdown } from "@codemirror/lang-markdown";
 import { closeSearchPanel, openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { tags } from "@lezer/highlight";
 
+/**
+ * Mounts and focuses a line-numbered, wrapped Markdown text editor.
+ * Internally uses LF; outgoing changes restore the source's BOM and LF/CRLF
+ * convention. Replacing text updates that convention without notifying autosave.
+ * @param host - Parent DOM container.
+ * @param source - Initial source text, optionally including a UTF-8 BOM.
+ * @param dark - Initial syntax palette.
+ * @param onChange - Receives full source after user-originated document changes.
+ * @returns Controls whose destroy method must be called when leaving edit mode.
+ */
 export function createTextEditor(host: HTMLElement, source: string, dark: boolean, onChange: (source: string) => void) {
   const theme = new Compartment();
   let bom = source.startsWith("\uFEFF") ? "\uFEFF" : "";
@@ -38,8 +52,11 @@ export function createTextEditor(host: HTMLElement, source: string, dark: boolea
   });
   view.focus();
   return {
+    /** Returns keyboard focus to the text editor. */
     focus: () => view.focus(),
+    /** Reconfigures syntax colors without disturbing document text or undo history. */
     setTheme: (dark: boolean) => view.dispatch({ effects: theme.reconfigure(colors(dark)) }),
+    /** Replaces source from disk, suppressing onChange to avoid an autosave feedback loop. */
     replace(source: string) {
       replacing = true;
       try {
@@ -50,10 +67,14 @@ export function createTextEditor(host: HTMLElement, source: string, dark: boolea
         replacing = false;
       }
     },
+    /** Opens the editor's built-in search panel. */
     find: () => openSearchPanel(view),
+    /** Closes the editor's built-in search panel. */
     closeFind: () => closeSearchPanel(view),
+    /** Releases CodeMirror's DOM and event resources. */
     destroy: () => view.destroy(),
   };
 }
 
+/** Lifecycle/search/theme controls returned by {@link createTextEditor}. */
 export type TextEditor = ReturnType<typeof createTextEditor>;

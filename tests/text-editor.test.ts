@@ -3,6 +3,8 @@ import { EditorView } from "@codemirror/view";
 import { createTextEditor } from "../src/text-editor";
 
 beforeEach(() => {
+  // CodeMirror measures selections asynchronously; inert geometry supports mounting
+  // while Playwright separately verifies actual browser layout and syntax colors.
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   document.body.innerHTML = "<div id=\"host\"></div>";
   Object.defineProperty(Range.prototype, "getClientRects", { configurable: true, value: () => [] });
@@ -10,6 +12,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+/** Mounts the configured editor, drives an actual document transaction and verifies resource cleanup. */
 it("provides Markdown syntax, line numbers, history, themes, search and source replacement", () => {
   const changed = vi.fn();
   const host = document.getElementById("host")!;
@@ -25,6 +28,7 @@ it("provides Markdown syntax, line numbers, history, themes, search and source r
   editor.closeFind();
   expect(host.querySelector(".cm-search")).toBeNull();
   editor.replace("# Fresh");
+  // Disk replacement is not user typing and must not schedule another autosave.
   expect(changed).toHaveBeenCalledTimes(1);
   expect(view.state.doc.toString()).toBe("# Fresh");
   editor.focus();
@@ -32,6 +36,10 @@ it("provides Markdown syntax, line numbers, history, themes, search and source r
   expect(host.children).toHaveLength(0);
 });
 
+/**
+ * Initial and reloaded documents may use different conventions. Outgoing full
+ * source must preserve the current BOM and selected separator, normalizing mixed lines.
+ */
 it("preserves a BOM and CRLF line endings when editing and replacing text", () => {
   const changed = vi.fn();
   const host = document.getElementById("host")!;
@@ -51,3 +59,9 @@ it("preserves a BOM and CRLF line endings when editing and replacing text", () =
   expect(changed).toHaveBeenLastCalledWith("\uFEFF# Mixed\r\nFirst\r\nSecond\r\nLast");
   editor.destroy();
 });
+/**
+ * Real CodeMirror integration under jsdom, not a mocked editor implementation.
+ * Geometry-only browser APIs are stubbed because jsdom does not lay out text.
+ * Transactions exercise callbacks, search controls and BOM/newline serialization.
+ * @packageDocumentation
+ */

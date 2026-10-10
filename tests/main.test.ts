@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/** Native service spies and captured event callbacks installed before entry-module import. */
 const native = vi.hoisted(() => ({
   invoke: vi.fn(),
   listen: vi.fn(),
@@ -11,7 +12,9 @@ const native = vi.hoisted(() => ({
   window: { setTheme: vi.fn(), setTitle: vi.fn(), show: vi.fn(), setFocus: vi.fn(), onDragDropEvent: vi.fn(), onCloseRequested: vi.fn(), destroy: vi.fn() },
   events: new Map<string, (event?: { payload: number }) => void>(),
 }));
+/** Heavy render calls resolve without loading math/diagram engines in controller tests. */
 const renderers = vi.hoisted(() => ({ renderMath: vi.fn(), renderMermaid: vi.fn() }));
+/** Editor facade records mode/search calls and exposes its onChange callback. */
 const textEditor = vi.hoisted(() => ({ create: vi.fn(), destroy: vi.fn(), replace: vi.fn(), setTheme: vi.fn(), find: vi.fn(), closeFind: vi.fn() }));
 vi.mock("../src/text-editor", () => ({ createTextEditor: textEditor.create }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
@@ -28,12 +31,15 @@ vi.mock("../src/enhance", async importOriginal => ({
   ...renderers,
 }));
 
+/** Actual listeners registered by each fresh controller import, removed during teardown. */
 const listeners: [EventTarget, string, EventListenerOrEventListenerObject][] = [];
+/** Small native response with deterministic timing and optional scenario-specific HTML. */
 const doc = (path: string, html = '<h1 id="title">Title</h1><p>Text</p>') => ({
   path, dir: "/docs", title: path.split("/").at(-1), html, renderMs: 2.34,
 });
 
 beforeEach(() => {
+  // Import reset recreates module state; the maintained HTML keeps toolbar IDs honest.
   vi.resetModules();
   vi.resetAllMocks();
   vi.useFakeTimers();
@@ -46,6 +52,7 @@ beforeEach(() => {
   const html = readFileSync("index.html", "utf8");
   document.body.innerHTML = new DOMParser().parseFromString(html, "text/html").body.innerHTML;
   for (const target of [document, window]) {
+    // Keep real event dispatch but record subscriptions so subsequent cases do not double-handle.
     const add = target.addEventListener.bind(target);
     vi.spyOn(target, "addEventListener").mockImplementation((type: string, callback: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => {
       listeners.push([target, type, callback]);
@@ -72,24 +79,28 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Undo listeners and timers before the next import of this side-effectful entry module.
   for (const [target, type, callback] of listeners.splice(0)) target.removeEventListener(type, callback);
   vi.clearAllTimers();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
+/** Starts a fresh controller with an optional initial file and drains immediate asynchronous work. */
 async function start(path?: string) {
   if (path) history.replaceState(null, "", `/?file=${encodeURIComponent(path)}`);
   await import("../src/main");
   await vi.advanceTimersByTimeAsync(0);
 }
 
+/** Clicks a real DOM control and drains immediate command promises without advancing debounce time. */
 async function click(id: string) {
   document.getElementById(id)!.click();
   await vi.advanceTimersByTimeAsync(0);
 }
 
 describe("application controller", () => {
+  /** Welcome startup restores outline preference and reveals the native window after first paint. */
   it("shows the welcome screen, preserves outline preference, and paints before revealing the window", async () => {
     localStorage.setItem("omarkd.outline", "1");
     await start();
@@ -102,6 +113,7 @@ describe("application controller", () => {
     expect(document.head.textContent).toContain(".sx-code");
   });
 
+  /** Native rendering must be sanitized, enhanced, titled and watched before reader interaction. */
   it("loads initial files, sanitizes HTML, sets title and starts watching", async () => {
     native.invoke.mockImplementation(async (command: string) => {
       if (command === "render_file") return doc("/docs/one.md", '<h1 id="title">Title</h1><script>bad()</script><pre><code>code</code></pre>');
@@ -119,6 +131,7 @@ describe("application controller", () => {
     expect(renderers.renderMermaid).toHaveBeenCalledOnce();
   });
 
+  /** Cancel leaves the view untouched; multi-select opens the first file here and the remainder elsewhere. */
   it("treats cancelled dialogs as no action and opens remaining files in new windows", async () => {
     await start();
     await click("btn-open");
@@ -133,6 +146,7 @@ describe("application controller", () => {
     expect(document.getElementById("doc-path")?.textContent).toBe("/docs/three.md");
   });
 
+  /** Even a failure string containing script markup is displayed inertly as diagnostic text. */
   it("reports load errors as text instead of HTML", async () => {
     native.invoke.mockImplementation(async (command: string) => {
       if (command === "render_file") throw new Error("<script>missing</script>");
@@ -144,6 +158,7 @@ describe("application controller", () => {
     expect(native.window.setTitle).toHaveBeenCalledWith("Omarkd");
   });
 
+  /** Watch subscription failure is nonfatal for reading but must be visible and logged. */
   it("surfaces watcher failure while keeping the document readable", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     native.invoke.mockImplementation(async (command: string, args?: { path: string }) => {
@@ -158,6 +173,7 @@ describe("application controller", () => {
     expect(document.querySelector("#content h1")).not.toBeNull();
   });
 
+  /** Multiple file events in the 60 ms window cause one reload without resetting reader position. */
   it("debounces live reload and preserves scroll", async () => {
     await start("/docs/one.md");
     document.getElementById("scroller")!.scrollTop = 120;
@@ -170,6 +186,7 @@ describe("application controller", () => {
     expect(document.getElementById("scroller")!.scrollTop).toBe(120);
   });
 
+  /** Post-render exceptions are logged while the successfully loaded base document remains usable. */
   it("keeps renderer failures explicit without losing document content", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     renderers.renderMath.mockRejectedValueOnce(new Error("math unavailable"));
@@ -179,6 +196,7 @@ describe("application controller", () => {
     expect(document.querySelector("#content h1")?.textContent).toBe("Title");
   });
 
+  /** Browser-find arguments, temporary findbar hiding, no-match feedback and Escape are all wired. */
   it("handles find controls, no matches, reverse searches and Escape", async () => {
     const find = vi.fn().mockReturnValue(false);
     vi.stubGlobal("find", find);
@@ -195,6 +213,7 @@ describe("application controller", () => {
     expect(document.getElementById("findbar")!.hidden).toBe(true);
   });
 
+  /** Link classification determines which native opener is called without navigating the trusted webview. */
   it("routes links to external handlers, attachments, new windows and reveal", async () => {
     await start("/docs/one.md");
     document.getElementById("content")!.innerHTML += '<a id="external" href="https://example.com">External</a><a id="attachment" href="notes.txt">File</a><a id="new-window" href="two.md">Second</a>';
@@ -208,6 +227,7 @@ describe("application controller", () => {
     expect(native.revealItemInDir).toHaveBeenCalledWith("/docs/one.md");
   });
 
+  /** Only handled keyboard combinations prevent defaults; unrelated input remains available. */
   it("handles shortcuts and ignores unrelated keys", async () => {
     await start();
     const key = (value: string, shiftKey = false) => {
@@ -225,6 +245,7 @@ describe("application controller", () => {
     expect(native.open).toHaveBeenCalledOnce();
   });
 
+  /** All history entry points share document/scroll stacks, including empty-stack no-ops. */
   it("navigates back and forward with toolbar, keyboard and mouse while restoring scroll", async () => {
     await start("/docs/one.md");
     await click("btn-back");
@@ -252,6 +273,7 @@ describe("application controller", () => {
     expect(document.getElementById("doc-path")?.textContent).toBe("/docs/two.md");
   });
 
+  /** Fragment routing tolerates invalid encoding and legacy named anchors without redundant file loads. */
   it("jumps to encoded and legacy anchors and handles missing or malformed fragments", async () => {
     await start("/docs/one.md");
     document.getElementById("content")!.innerHTML += '<h2 id="hello world">Hello</h2><a name="legacy">Legacy</a><a id="encoded" href="#hello%20world">Encoded</a><a id="old" href="#legacy">Old</a><a id="malformed" href="#%ZZ">Malformed</a><a id="same" href="one.md#title">Same</a><a id="missing" href="one.md#absent">Missing</a>';
@@ -267,6 +289,7 @@ describe("application controller", () => {
     expect(native.invoke.mock.calls.filter(([command]) => command === "render_file")).toHaveLength(1);
   });
 
+  /** Emulated native drag callbacks test the visual state and file filtering, not real OS drag delivery. */
   it("handles native drag states, filters Markdown files, and falls back for other dropped paths", async () => {
     await start();
     const drag = native.window.onDragDropEvent.mock.calls[0][0];
@@ -284,6 +307,7 @@ describe("application controller", () => {
     expect(document.getElementById("doc-path")?.textContent).toBe("/docs/notes.txt");
   });
 
+  /** Deferred success/failure from older requests cannot overwrite the newest document or its status. */
   it("ignores stale successful and failed loads when a newer file has won", async () => {
     await start();
     let resolveFirst!: (value: ReturnType<typeof doc>) => void;
@@ -306,6 +330,7 @@ describe("application controller", () => {
     expect(document.querySelector(".load-error")).toBeNull();
   });
 
+  /** The controller routes edit-mode shortcuts and flushes source before changing documents. */
   it("toggles edit/view, routes search and reload to the editor and saves before navigation", async () => {
     await start("/docs/one.md");
     await click("btn-edit");
@@ -334,6 +359,7 @@ describe("application controller", () => {
     expect(document.body.classList.contains("is-editing")).toBe(false);
   });
 
+  /** Unsaved failures preserve the editor across navigation/close/Quit until explicit retry succeeds. */
   it("blocks navigation and closing on save failure, guards unload and flushes before quit", async () => {
     await start("/docs/one.md");
     await click("btn-edit");
@@ -369,6 +395,7 @@ describe("application controller", () => {
     expect(native.window.destroy).toHaveBeenCalledOnce();
   });
 
+  /** Clean close proceeds; stale cancelled quits are ignored and command errors restore interaction. */
   it("lets clean native close proceed and reports quit callback failures", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await start();
@@ -389,3 +416,10 @@ describe("application controller", () => {
     expect(log).toHaveBeenCalledWith("Could not complete quit request", expect.any(Error));
   });
 });
+/**
+ * Whole-webview controller tests using the maintained index.html and jsdom.
+ * Native commands/events, heavy renderers and CodeMirror are mocked at their
+ * boundaries. Real DOM routing, sanitizer, history and save queue still execute.
+ * Fake time controls startup/reload/autosave; deferred promises force load races.
+ * @packageDocumentation
+ */

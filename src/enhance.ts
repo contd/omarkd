@@ -1,10 +1,19 @@
-// Heavy renderers are imported on demand so documents without math or diagrams
-// never pay for them.
+/**
+ * Post-render reader enhancements: math, diagrams, code copying and heading outline.
+ * Heavy renderers load only when the document contains corresponding markers.
+ * @packageDocumentation
+ */
 
 import { getTheme } from "./theme";
 
+/** Temml macro state reset per render so definitions do not leak between documents. */
 let mathMacros: Record<string, unknown> = {};
 
+/**
+ * Converts Comrak math markers to MathML using a lazily loaded Temml module.
+ * Annotated expressions preserve source; individual render exceptions mark the
+ * original node with an error class/title rather than losing its text.
+ */
 export async function renderMath(root: HTMLElement): Promise<void> {
   const nodes = root.querySelectorAll<HTMLElement>("[data-math-style]");
   if (nodes.length === 0) return;
@@ -31,8 +40,10 @@ export async function renderMath(root: HTMLElement): Promise<void> {
   }
 }
 
+/** Shared lazy module promise reused by later diagram renders. */
 let mermaidReady: Promise<typeof import("mermaid").default> | undefined;
 
+/** Renders Mermaid source markers locally with strict security and the current app palette. */
 export async function renderMermaid(root: HTMLElement): Promise<void> {
   const nodes = Array.from(root.querySelectorAll<HTMLElement>("pre.mermaid"));
   if (nodes.length === 0) return;
@@ -47,6 +58,7 @@ export async function renderMermaid(root: HTMLElement): Promise<void> {
   await mermaid.run({ nodes, suppressErrors: true });
 }
 
+/** Adds accessible copy controls to ordinary code blocks, excluding Mermaid source. */
 export function addCopyButtons(root: HTMLElement): void {
   for (const pre of root.querySelectorAll<HTMLPreElement>("pre:not(.mermaid)")) {
     if (!pre.querySelector("code")) continue;
@@ -59,6 +71,10 @@ export function addCopyButtons(root: HTMLElement): void {
   }
 }
 
+/**
+ * Handles a delegated code-copy click and temporarily labels its button "Copied".
+ * @returns Whether the click targeted a copy button, allowing the controller to stop routing.
+ */
 export function handleCopyClick(event: MouseEvent): boolean {
   const button = (event.target as Element).closest?.("button.copy");
   if (!button) return false;
@@ -70,6 +86,7 @@ export function handleCopyClick(event: MouseEvent): boolean {
   return true;
 }
 
+/** Replaces the navigation list with encoded fragment links to level 1-4 headings with IDs. */
 export function buildOutline(root: HTMLElement, nav: HTMLElement): void {
   const headings = root.querySelectorAll<HTMLElement>("h1[id], h2[id], h3[id], h4[id]");
   const list = document.createElement("ol");

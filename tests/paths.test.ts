@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isExternalUrl, isMarkdownPath, resolvePath, splitHref } from "../src/paths";
 
 describe("Markdown paths", () => {
+  // The recognized and rejected tables prevent suffix-only and case-sensitivity regressions.
   it.each(["a.md", "a.MARKDOWN", "a.mdown", "a.mkd", "a.mkdn", "a.mdx"])("recognizes %s", (path) => {
     expect(isMarkdownPath(path)).toBe(true);
   });
@@ -11,6 +12,7 @@ describe("Markdown paths", () => {
 });
 
 describe("external URLs", () => {
+  // URI schemes route to native handlers; file URLs and fragments stay in-document.
   it.each(["https://example.com", "http://example.com", "mailto:a@example.com", "custom+app:value"])("recognizes %s", (url) => {
     expect(isExternalUrl(url)).toBe(true);
   });
@@ -20,6 +22,7 @@ describe("external URLs", () => {
 });
 
 describe("path resolution", () => {
+  // Expected strings specify normalization exactly, including root traversal and drive preservation.
   it.each([
     ["/docs", "./a.md", "/docs/a.md"],
     ["/docs/sub/", "../a%20b.md", "/docs/a b.md"],
@@ -36,6 +39,7 @@ describe("path resolution", () => {
 });
 
 describe("link splitting", () => {
+  // Queries are stripped only from the path; additional fragment hashes remain intact.
   it.each([
     ["a.md?view=1#hello", ["a.md", "hello"]],
     ["#hello", ["", "hello"]],
@@ -46,3 +50,9 @@ describe("link splitting", () => {
     expect(splitHref(href)).toEqual(expected);
   });
 });
+/**
+ * Pure routing tests: extension detection, URL classification and lexical paths.
+ * Table-driven cases include Windows drives, Unicode, malformed percent escapes
+ * and fragments; no filesystem access or native browser handlers are involved.
+ * @packageDocumentation
+ */

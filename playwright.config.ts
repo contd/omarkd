@@ -1,5 +1,11 @@
 import { defineConfig } from "@playwright/test";
 
+// Documentation runs use a dedicated server so ordinary tests cannot remove its
+// server or artifacts midway through a report. Test output is isolated by the runner.
+const reportRun = process.env.OMARKD_E2E_REPORT === "1";
+const port = reportRun ? 1431 : 1430;
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
@@ -11,7 +17,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:1430",
+    baseURL,
     viewport: { width: 1100, height: 820 },
     colorScheme: "light",
     locale: "en-US",
@@ -21,8 +27,8 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: {
-    command: "bun run dev --host 127.0.0.1 --port 1430",
-    url: "http://127.0.0.1:1430",
-    reuseExistingServer: !process.env.CI,
+    command: `bun run dev --host 127.0.0.1 --port ${port}`,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI && !reportRun,
   },
 });

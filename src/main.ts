@@ -1,3 +1,11 @@
+/**
+ * Application entry point for one document webview.
+ *
+ * Wires native commands/events to rendering, history, search, theme and edit mode.
+ * Load tokens reject stale renders; editor transitions flush drafts before
+ * navigation, close and coordinated Quit. Importing this module starts the UI.
+ * @packageDocumentation
+ */
 import "temml/dist/Temml-Local.css";
 import "./styles.css";
 

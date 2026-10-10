@@ -3,18 +3,23 @@ import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./bridge";
 
+/** Platform modifier matches the application's Cmd/Ctrl keyboard handling. */
 const mod = process.platform === "darwin" ? "Meta" : "Control";
 
+/** Loads a virtual file through the real controller and waits for rendered heading/path agreement. */
 async function openDocument(page: Page, name = "reader") {
   await page.goto(`/?file=/documents/${name}.md`);
   await expect(page.locator("#doc-path")).toHaveText(`/documents/${name}.md`);
   await expect(page.locator("#content h1")).toBeVisible();
 }
 
+/** Counts recorded native requests to distinguish debounced actions from duplicated calls. */
 async function commandCount(page: Page, command: string) {
   return page.evaluate(command => window.omarkdTest.calls.filter(call => call.command === command).length, command);
 }
 
+// Stable font/paint timing avoids partial diagram/text captures. Failed tests rely
+// on Playwright's automatic screenshot and retained trace instead of this success hook.
 test.afterEach(async ({ page }, info) => {
   if (info.status !== "passed") return;
   await page.evaluate(async () => {
@@ -30,6 +35,7 @@ test.afterEach(async ({ page }, info) => {
   await info.attach("Feature screenshot", { path, contentType: "image/png" });
 });
 
+/** Welcome branding, cancelled open flow and native reveal/focus requests remain coherent without a file. */
 test("welcome", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Omarkd", exact: true })).toBeVisible();
@@ -43,6 +49,7 @@ test("welcome", async ({ page }) => {
   expect(await commandCount(page, "plugin:window|set_focus")).toBe(1);
 });
 
+/** Real Comrak output shows supported Markdown constructs while hiding front matter. */
 test("markdown", async ({ page }) => {
   await openDocument(page);
   await expect(page.locator("#content h1")).toHaveText("Read beautifully 🚀");
@@ -63,6 +70,7 @@ test("markdown", async ({ page }) => {
   await expect(page.locator("#status")).toHaveText("1.0 ms");
 });
 
+/** Actual browser clipboard gets plain highlighted source; token colors differ from body text. */
 test("code-and-copy", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await openDocument(page, "code");
@@ -80,6 +88,7 @@ test("code-and-copy", async ({ page, context }) => {
   expect(color).not.toBe(await page.locator("#content").evaluate(el => getComputedStyle(el).color));
 });
 
+/** Real Temml replaces all inline/display/fenced markers with native MathML. */
 test("math", async ({ page }) => {
   await openDocument(page, "math");
   await expect(page.locator("#content math")).toHaveCount(3);
@@ -89,6 +98,7 @@ test("math", async ({ page }) => {
   await expect(page.locator("#content pre")).toHaveCount(0);
 });
 
+/** Mermaid renders locally with remote network blocked; its source is not treated as a copyable code block. */
 test("diagrams", async ({ page }) => {
   await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
   await openDocument(page, "diagrams");
@@ -97,6 +107,7 @@ test("diagrams", async ({ page }) => {
   await expect(page.locator("pre.mermaid button.copy")).toHaveCount(0);
 });
 
+/** Rich passive HTML/images stay useful while embedded active content is removed before execution. */
 test("safe-html-and-images", async ({ page }) => {
   await openDocument(page, "html");
   await page.getByText("Expand the details", { exact: true }).click();
@@ -109,6 +120,7 @@ test("safe-html-and-images", async ({ page }) => {
   expect(await page.evaluate(() => "omarkdInjected" in window)).toBe(false);
 });
 
+/** Outline navigation targets headings and its visibility preference survives reload. */
 test("outline", async ({ page }) => {
   await openDocument(page, "code");
   await page.getByRole("button", { name: "Toggle outline" }).click();
@@ -123,6 +135,7 @@ test("outline", async ({ page }) => {
   await page.keyboard.press(`${mod}+Shift+O`);
 });
 
+/** Links, fragments and keyboard/toolbar history share consistent document and anchor state. */
 test("document-navigation", async ({ page }) => {
   await openDocument(page);
   await page.getByRole("link", { name: "Second document", exact: true }).click();
@@ -139,6 +152,7 @@ test("document-navigation", async ({ page }) => {
   await expect(page.locator("#keep-exploring")).toBeInViewport();
 });
 
+/** A controlled multi-file dialog opens one current document and records separate-window requests. */
 test("open-files", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => { window.omarkdTest.dialogResult = ["/documents/reader.md", "/documents/second.md"]; });
@@ -153,6 +167,7 @@ test("open-files", async ({ page }) => {
   expect(options).toMatchObject({ options: { multiple: true, directory: false, defaultPath: "/documents" } });
 });
 
+/** Emulated native drag events verify drag affordance and Markdown selection, not OS event delivery. */
 test("drag-and-drop", async ({ page }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.omarkdTest.calls.filter(call => call.args.event === "tauri://drag-drop").length)).toBe(1);
@@ -165,6 +180,7 @@ test("drag-and-drop", async ({ page }) => {
   await page.evaluate(() => window.omarkdTest.emit("tauri://drag-leave", null));
 });
 
+/** Real window.find cycles matches in both directions and excludes its own input from matching. */
 test("find", async ({ page }) => {
   await openDocument(page);
   await page.getByRole("button", { name: "Find", exact: true }).click();
@@ -211,6 +227,7 @@ test("find", async ({ page }) => {
   await expect(input).toHaveValue("Markdown");
 });
 
+/** Repeated watcher events debounce to one render; both live and manual reload preserve scroll. */
 test("live-reload", async ({ page }) => {
   await openDocument(page, "code");
   await page.evaluate(() => { document.getElementById("scroller")!.scrollTop = 120; });
@@ -230,6 +247,7 @@ test("live-reload", async ({ page }) => {
   await expect.poll(() => page.locator("#scroller").evaluate(el => el.scrollTop)).toBe(120);
 });
 
+/** Verify exact opener/reveal arguments and modifier-click routing without launching external apps. */
 test("desktop-link-actions", async ({ page }) => {
   await openDocument(page);
   await page.getByRole("link", { name: "External website" }).click();
@@ -244,6 +262,7 @@ test("desktop-link-actions", async ({ page }) => {
   await expect(page.locator("#content h1")).toHaveText("Read beautifully 🚀");
 });
 
+/** A missing file replaces the reader with an explicit diagnostic and clears stale outline/title state. */
 test("errors", async ({ page }) => {
   await openDocument(page);
   await page.getByRole("link", { name: "Missing document" }).click();
@@ -253,6 +272,7 @@ test("errors", async ({ page }) => {
   expect(await page.evaluate(() => window.omarkdTest.calls.filter(call => call.command === "plugin:window|set_title").at(-1)?.args.value)).toBe("Omarkd");
 });
 
+/** Watcher setup errors remain visible without discarding the rendered document. */
 test("watch-errors", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => {
@@ -265,6 +285,7 @@ test("watch-errors", async ({ page }) => {
   await expect(page.locator("#content h1")).toHaveText("Read beautifully 🚀");
 });
 
+/** Force an older request to complete after the newer file and verify its stale result is ignored. */
 test("latest-document-wins", async ({ page }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.omarkdTest.calls.filter(call => call.args.event === "tauri://drag-drop").length)).toBe(1);
@@ -278,6 +299,7 @@ test("latest-document-wins", async ({ page }) => {
   await expect(page.locator("#content h1")).toHaveText("Second document");
 });
 
+/** Actual Mermaid colors and root theme persist/reload and synchronize across sibling browser pages. */
 test("light-and-dark", async ({ page, context }) => {
   await openDocument(page, "diagrams");
   await expect(page.locator("pre.mermaid svg")).toBeVisible();
@@ -302,6 +324,7 @@ test("light-and-dark", async ({ page, context }) => {
   await expect(page.locator("pre.mermaid .node rect").first()).toHaveCSS("fill", "rgb(31, 32, 32)");
 });
 
+/** OS-following mode changes palette without storing a manual preference or forcing a native palette. */
 test("system-theme", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await openDocument(page);
@@ -313,6 +336,7 @@ test("system-theme", async ({ page }) => {
   expect(themes.every(theme => theme === null)).toBe(true);
 });
 
+/** Minimum native width must retain toolbar access and avoid document-level horizontal overflow. */
 test("compact-window", async ({ page }) => {
   await page.setViewportSize({ width: 420, height: 640 });
   await openDocument(page);
@@ -322,6 +346,7 @@ test("compact-window", async ({ page }) => {
   await expect(page.locator("#content")).toHaveCSS("padding-left", "18px");
 });
 
+/** Syntect classes respond to the app's manual palette, including token and block background colors. */
 test("dark-code", async ({ page }) => {
   await openDocument(page, "code");
   const keyword = page.locator("#content .sx-keyword").first();
@@ -334,6 +359,7 @@ test("dark-code", async ({ page }) => {
   await expect(page.locator("#content pre > code").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 });
 
+/** Network requests for heavy math/diagram modules are absent when a plain document needs neither. */
 test("lazy-loading", async ({ page }) => {
   const heavyRequests: string[] = [];
   page.on("request", request => {
@@ -344,3 +370,10 @@ test("lazy-loading", async ({ page }) => {
   expect(heavyRequests).toEqual([]);
   await expect(page.locator("#content math, #content pre.mermaid")).toHaveCount(0);
 });
+/**
+ * Reader feature tests against real frontend UI and Rust-generated Markdown fixtures.
+ * Math/diagrams/search/layout run in Chromium; only native desktop calls are
+ * intercepted. API-call assertions are not substitutes for native OS smoke checks.
+ * Every passing case attaches a screenshot without overwriting README captures in ordinary runs.
+ * @packageDocumentation
+ */
