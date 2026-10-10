@@ -1,0 +1,98 @@
+#!/bin/sh
+# omarkd — open Markdown files in the Omarkd viewer, VS Code `code`-style.
+#
+#   omarkd README.md docs/guide.md     open files (each in its own window)
+#   omarkd .                           open ./README.md
+#   omarkd                             open an empty window
+#
+# If Omarkd is already running, files open in the existing instance.
+# Set OMARKD_BIN to override the app binary location.
+
+set -e
+
+usage() {
+  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+  exit 0
+}
+
+# Resolve this script's real location (it is usually symlinked onto PATH).
+self="$0"
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case "$link" in
+    /*) self="$link" ;;
+    *) self="$(dirname "$self")/$link" ;;
+  esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd)
+
+find_bin() {
+  if [ -n "$OMARKD_BIN" ]; then
+    echo "$OMARKD_BIN"
+    return
+  fi
+  case "$(uname -s)" in
+    Darwin)
+      for app in \
+        "/Applications/Omarkd.app" \
+        "$HOME/Applications/Omarkd.app" \
+        "$root/src-tauri/target/release/bundle/macos/Omarkd.app"; do
+        if [ -x "$app/Contents/MacOS/omarkd" ]; then
+          echo "$app/Contents/MacOS/omarkd"
+          return
+        fi
+      done
+      app=$(mdfind "kMDItemCFBundleIdentifier == 'dev.omarkd.app'" 2>/dev/null | head -n 1)
+      if [ -n "$app" ] && [ -x "$app/Contents/MacOS/omarkd" ]; then
+        echo "$app/Contents/MacOS/omarkd"
+        return
+      fi
+      ;;
+    *)
+      for bin in /usr/bin/omarkd /usr/local/lib/omarkd/omarkd /opt/omarkd/omarkd; do
+        if [ -x "$bin" ] && [ "$bin" != "$self" ]; then
+          echo "$bin"
+          return
+        fi
+      done
+      ;;
+  esac
+  if [ -x "$root/src-tauri/target/release/omarkd" ]; then
+    echo "$root/src-tauri/target/release/omarkd"
+  fi
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    -h | --help) usage ;;
+    -v | --version)
+      sed -n 's/^  "version": "\(.*\)",$/omarkd \1/p' "$root/package.json" 2>/dev/null | head -n 1
+      exit 0
+      ;;
+  esac
+done
+
+bin=$(find_bin)
+if [ -z "$bin" ]; then
+  echo "omarkd: could not find the Omarkd app. Build it with 'bun run app:build' or set OMARKD_BIN." >&2
+  exit 1
+fi
+
+# Pass absolute paths so the running instance resolves them correctly.
+set_args=""
+for arg in "$@"; do
+  case "$arg" in
+    -*) ;;
+    /*) set -- "$@" "$arg" ;;
+    *) set -- "$@" "$PWD/$arg" ;;
+  esac
+  set_args="x$set_args"
+done
+# Drop the original arguments, keeping only the rewritten ones.
+count=${#set_args}
+while [ "$count" -gt 0 ]; do
+  shift
+  count=$((count - 1))
+done
+
+nohup "$bin" "$@" >/dev/null 2>&1 &

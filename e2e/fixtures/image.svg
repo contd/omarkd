@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <rect width="640" height="160" rx="16" fill="#10212f"/>
+  <rect x="24" y="40" width="180" height="80" rx="12" fill="#203849"/>
+  <rect x="232" y="40" width="176" height="80" rx="12" fill="#203849"/>
+  <rect x="436" y="40" width="180" height="80" rx="12" fill="#203849"/>
+  <path d="M204 80h28m176 0h28" stroke="#6af2d2" stroke-width="4"/>
+  <g fill="#f3fafc" font-family="sans-serif" font-size="20" text-anchor="middle">
+    <text x="114" y="87">Markdown</text><text x="320" y="87">Omarkd</text><text x="526" y="87">Your ideas</text>
+  </g>
+</svg>

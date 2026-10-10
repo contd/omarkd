@@ -1,0 +1,90 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mermaid = vi.hoisted(() => ({ initialize: vi.fn(), run: vi.fn().mockResolvedValue(undefined) }));
+const temml = vi.hoisted(() => ({ render: vi.fn() }));
+vi.mock("../src/theme", () => ({ getTheme: () => "dark" }));
+vi.mock("mermaid", () => ({ default: mermaid }));
+vi.mock("temml", () => ({ default: temml }));
+
+import { addCopyButtons, buildOutline, handleCopyClick, renderMath, renderMermaid } from "../src/enhance";
+
+beforeEach(() => {
+  document.body.innerHTML = "";
+  temml.render.mockImplementation((source: string, target: HTMLElement) => { target.textContent = source; });
+});
+afterEach(() => vi.useRealTimers());
+
+describe("reader enhancements", () => {
+  it("builds a heading outline with safe text, encoded anchors and levels", () => {
+    const root = document.createElement("article");
+    root.innerHTML = '<h1 id="hello world">Hello <em>world</em></h1><h3 id="three">Third</h3><h5 id="five">Ignored</h5><h2>No id</h2>';
+    const nav = document.createElement("nav");
+    buildOutline(root, nav);
+    expect(nav.querySelectorAll("li")).toHaveLength(2);
+    expect(nav.querySelector("a")?.getAttribute("href")).toBe("#hello%20world");
+    expect(nav.querySelector("a")?.textContent).toBe("Hello world");
+    expect(nav.querySelectorAll("li")[1].className).toBe("lvl-3");
+    expect(nav.classList.contains("empty")).toBe(false);
+    buildOutline(document.createElement("article"), nav);
+    expect(nav.classList.contains("empty")).toBe(true);
+    expect(nav.querySelectorAll("li")).toHaveLength(0);
+  });
+
+  it("adds copy buttons only to code blocks and copies plain text", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const root = document.createElement("article");
+    root.innerHTML = '<pre><code><span>const a = 1;</span></code></pre><pre class="mermaid"><code>graph TD</code></pre><pre>plain</pre>';
+    document.body.append(root);
+    addCopyButtons(root);
+    const button = root.querySelector<HTMLButtonElement>("button")!;
+    expect(root.querySelectorAll("button")).toHaveLength(1);
+    button.addEventListener("click", handleCopyClick);
+    button.click();
+    await Promise.resolve();
+    expect(writeText).toHaveBeenCalledWith("const a = 1;");
+    expect(button.textContent).toBe("Copied");
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(button.textContent).toBe("Copy");
+    const event = new MouseEvent("click");
+    Object.defineProperty(event, "target", { value: root });
+    expect(handleCopyClick(event)).toBe(false);
+  });
+
+  it("renders inline, display and fenced math and replaces the fenced pre", async () => {
+    const root = document.createElement("article");
+    root.innerHTML = '<code data-math-style="inline">x</code><code data-math-style="display">y</code><pre><code data-math-style="display">z</code></pre>';
+    await renderMath(root);
+    expect(root.querySelectorAll(".math-inline")).toHaveLength(1);
+    expect(root.querySelectorAll(".math-display")).toHaveLength(2);
+    expect(root.querySelector("pre")).toBeNull();
+    expect(temml.render).toHaveBeenCalledTimes(3);
+    expect(temml.render.mock.calls[0][2]).toMatchObject({ displayMode: false, throwOnError: false, annotate: true });
+  });
+
+  it("marks math errors with the diagnostic and keeps source readable", async () => {
+    temml.render.mockImplementationOnce(() => { throw new Error("invalid math"); });
+    const root = document.createElement("article");
+    root.innerHTML = '<code data-math-style="inline">bad</code>';
+    await renderMath(root);
+    expect(root.querySelector(".math-error")?.textContent).toBe("bad");
+    expect(root.querySelector<HTMLElement>("code")?.title).toContain("invalid math");
+  });
+
+  it("does not load heavy renderers for documents without math or diagrams", async () => {
+    const root = document.createElement("article");
+    await renderMath(root);
+    await renderMermaid(root);
+    expect(temml.render).not.toHaveBeenCalled();
+    expect(mermaid.run).not.toHaveBeenCalled();
+  });
+
+  it("renders Mermaid in the active theme and strict mode", async () => {
+    const root = document.createElement("article");
+    root.innerHTML = '<pre class="mermaid">graph TD; A--&gt;B;</pre>';
+    await renderMermaid(root);
+    expect(mermaid.initialize).toHaveBeenCalledWith({ startOnLoad: false, securityLevel: "strict", theme: "dark", fontFamily: "inherit" });
+    expect(mermaid.run).toHaveBeenCalledWith({ nodes: [root.firstElementChild], suppressErrors: true });
+  });
+});

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>Omarkd</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header id="toolbar">
+      <button id="btn-outline" class="icon" title="Toggle outline (⌘⇧O)" aria-label="Toggle outline">
+        <svg viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h8" /></svg>
+      </button>
+      <button id="btn-back" class="icon" title="Back (⌘[)" aria-label="Back" disabled>
+        <svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" /></svg>
+      </button>
+      <button id="btn-forward" class="icon" title="Forward (⌘])" aria-label="Forward" disabled>
+        <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" /></svg>
+      </button>
+      <button id="doc-path" title="Reveal in file manager"></button>
+      <span id="status"></span>
+      <button id="btn-find" class="icon" title="Find (⌘F)" aria-label="Find">
+        <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+      </button>
+      <button id="btn-open" class="icon" title="Open file (⌘O)" aria-label="Open file">
+        <svg viewBox="0 0 16 16"><path d="M2 4.5V13h12V6H8L6.5 4.5z" /></svg>
+      </button>
+      <button id="btn-edit" class="icon" type="button" title="Switch to edit mode" aria-label="Edit mode" aria-pressed="false" disabled>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10.5 2 3.5 3.5-8 8-4 1 1-4zM8.5 4l3.5 3.5" /></svg>
+      </button>
+      <button id="btn-theme" class="icon" type="button" title="Switch to dark mode" aria-label="Dark mode" aria-pressed="false">
+        <svg class="theme-moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9A5.75 5.75 0 0 1 7 2.5 5.75 5.75 0 1 0 13.5 9Z" /></svg>
+        <svg class="theme-sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" /><path d="M8 1v1M8 14v1M1 8h1M14 8h1M3 3l.7.7M12.3 12.3l.7.7M3 13l.7-.7M12.3 3.7l.7-.7" /></svg>
+      </button>
+    </header>
+    <div id="findbar" hidden>
+      <input id="find-input" type="search" placeholder="Find in document" spellcheck="false" />
+      <span class="hint">↵ next · ⇧↵ previous · esc</span>
+    </div>
+    <div id="layout">
+      <nav id="outline" aria-label="Outline"></nav>
+      <main id="scroller">
+        <article id="content" class="markdown-body"></article>
+      </main>
+      <section id="editor-panel" aria-label="Edit document" hidden>
+        <div id="editor-message" role="status" aria-live="polite" hidden></div>
+        <div id="editor-host"></div>
+      </section>
+    </div>
+    <template id="welcome">
+      <section class="welcome">
+        <img class="logo" src="/icon.svg" alt="" width="96" height="96" />
+        <h1>Omarkd</h1>
+        <p>Drop a Markdown file here, or</p>
+        <button class="primary" data-action="open">Open a file… <kbd>⌘O</kbd></button>
+        <p class="muted">From a terminal: <code>omarkd README.md</code></p>
+      </section>
+    </template>
+  </body>
+</html>

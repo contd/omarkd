@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Omarkd</title>
+  <desc id="description">A luminous O surrounding a teal terminal prompt on a midnight-blue rounded square.</desc>
+  <defs>
+    <linearGradient id="background" x1="128" y1="64" x2="896" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#203849"/>
+      <stop offset="0.55" stop-color="#10212f"/>
+      <stop offset="1" stop-color="#09141f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(800 840) rotate(-135) scale(760)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#24d3bc" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#24d3bc" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="letter" x1="320" y1="256" x2="736" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f3fafc"/>
+      <stop offset="0.6" stop-color="#dceff2"/>
+      <stop offset="1" stop-color="#83e7d5"/>
+    </linearGradient>
+    <linearGradient id="prompt" x1="376" y1="436" x2="632" y2="588" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6af2d2"/>
+      <stop offset="1" stop-color="#27cdb8"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#background)"/>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#glow)"/>
+  <rect x="66" y="66" width="892" height="892" rx="206" fill="none" stroke="#c2f5ee" stroke-opacity="0.12" stroke-width="4"/>
+  <rect x="248" y="224" width="528" height="576" rx="248" fill="none" stroke="#030d16" stroke-opacity="0.3" stroke-width="76" transform="translate(0 12)"/>
+  <rect x="248" y="224" width="528" height="576" rx="248" fill="none" stroke="url(#letter)" stroke-width="76"/>
+  <path d="m376 436 84 76-84 76m160 0h96" fill="none" stroke="url(#prompt)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
