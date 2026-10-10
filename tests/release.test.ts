@@ -169,6 +169,24 @@ describe("release and Pages workflow contracts", () => {
     expect(JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8")).bundle.targets).toBe("all");
   });
 
+  /** Regression: checkout@v4 and other Node 20 actions emit deprecation warnings on current runners. */
+  it("uses only Node 24 major versions of GitHub-owned actions", () => {
+    const node24: Record<string, string> = {
+      "actions/checkout": "v7",
+      "actions/upload-artifact": "v7",
+      "actions/upload-pages-artifact": "v5",
+      "actions/configure-pages": "v6",
+      "actions/deploy-pages": "v5",
+    };
+    const used = ["release.yml", "pages.yml"].flatMap(file => Object.values(workflow(`.github/workflows/${file}`).jobs)
+      .flatMap(job => job.steps ?? []).map(step => step.uses).filter((uses): uses is string => uses?.startsWith("actions/") ?? false));
+    expect(used.length).toBeGreaterThan(0);
+    for (const uses of used) {
+      const [action, version] = uses.split("@");
+      expect(node24[action], uses).toBe(version);
+    }
+  });
+
   /** Pages serves generated docs as root, not the maintained source/config files beside them. */
   it("deploys complete tested docs and native API pages without publishing failed builds", () => {
     const pages = workflow(".github/workflows/pages.yml");
@@ -181,10 +199,11 @@ describe("release and Pages workflow contracts", () => {
     }
     expect(steps.some(step => step.run?.includes("playwright install --with-deps chromium"))).toBe(true);
     expect(steps.some(step => step.run?.includes("cp -R src-tauri/target/doc docs/typedoc/rust"))).toBe(true);
-    const upload = steps.find(step => step.uses === "actions/upload-pages-artifact@v3");
+    const upload = steps.find(step => step.uses === "actions/upload-pages-artifact@v5");
     expect(upload?.with?.path).toBe("docs/typedoc");
+    expect(upload?.with?.["include-hidden-files"]).toBe(true);
     expect(upload?.if).toBeUndefined();
-    expect(steps.find(step => step.uses === "actions/upload-artifact@v4")?.if).toBe("always()");
+    expect(steps.find(step => step.uses === "actions/upload-artifact@v7")?.if).toBe("always()");
     expect(pages.jobs.deploy.needs).toBe("build");
     expect(pages.jobs.deploy.permissions).toEqual({ pages: "write", "id-token": "write" });
     expect(pages.jobs.deploy.environment?.name).toBe("github-pages");
