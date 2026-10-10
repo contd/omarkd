@@ -1,7 +1,7 @@
 {
   "name": "omarkd",
   "productName": "Omarkd",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A fast, native Markdown viewer you can launch from the command line.",
   "private": true,
   "type": "module",

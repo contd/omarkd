@@ -1,6 +1,6 @@
 [package]
 name = "omarkd"
-version = "0.1.4"
+version = "0.1.5"
 description = "A fast, native Markdown viewer"
 edition = "2021"
 
