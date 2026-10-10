@@ -129,9 +129,11 @@ test("editor-undo-and-serialized-saves", async ({ page }) => {
   const writes = await page.evaluate(() => window.omarkdTest.calls.filter(call => call.command === "save_source"));
   expect(writes.map(call => call.args.source)).toEqual(["# First save", "# Latest save"]);
   expect(writes[1].args.expected).toBe("# First save");
-  await text.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
+  await text.press("ControlOrMeta+KeyZ");
   await expect(text).toHaveText("# First save");
-  await text.press(process.platform === "darwin" ? "Meta+Shift+z" : "Control+Shift+z");
+  // Physical KeyZ makes Shift produce key "Z", like a real keyboard. A literal
+  // lowercase "z" chord looks like plain Ctrl-z to CodeMirror on Linux and undoes again.
+  await text.press("ControlOrMeta+Shift+KeyZ");
   await expect(text).toHaveText("# Latest save");
 });
 
