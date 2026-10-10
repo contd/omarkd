@@ -415,16 +415,21 @@ required for these initial releases. There is no automatic updater configured.
 Native platform builds are checked on their respective runners, but native
 dialog/Finder/window-lifecycle smoke checks still require manual verification.
 
-Before releasing, keep the version in `package.json`, `src-tauri/tauri.conf.json`,
-the `[package]` section of `src-tauri/Cargo.toml`, and the `omarkd` entry in
-`src-tauri/Cargo.lock` identical. The release tag must match exactly:
+The version in `package.json`, `src-tauri/tauri.conf.json`, the `[package]` section
+of `src-tauri/Cargo.toml`, and the `omarkd` entry in `src-tauri/Cargo.lock` must be
+identical, and the release tag must match exactly. Bump versions with npm or Bun:
+the `version` lifecycle script copies the new version into the native manifests
+and stages them, so one bump commit and its tag contain all four files.
 
 ```sh
-bun run release:check v0.1.1
-# Commit and push the intended release changes first.
-git tag -a v0.1.1 -m "Omarkd v0.1.1"
-git push origin v0.1.1
+# Commit the intended release changes first.
+npm version patch          # or: bun pm version patch / minor / major / 0.2.0-beta.1
+git push --follow-tags     # pushes the commit and the new v* tag
 ```
+
+If versions have drifted (for example after editing `package.json` by hand), run
+`bun run version:sync` to copy `package.json`'s version everywhere, commit, then
+verify a tag with `bun run release:check vX.Y.Z` before pushing it.
 
 Tags use `vMAJOR.MINOR.PATCH`, optionally followed by a SemVer prerelease such as
 `v0.2.0-beta.1`. Build metadata (`+...`) is not supported. Prerelease tags create

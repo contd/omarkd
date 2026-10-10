@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { checkReleaseTag, readReleaseVersions } from "../scripts/check-release";
+import { checkReleaseTag, readReleaseVersions, syncReleaseVersions } from "../scripts/check-release";
 
 /** Relevant Actions YAML fields; unknown action-specific values remain unknown. */
 interface Workflow {
@@ -101,6 +101,47 @@ describe("release version safety", () => {
   it("keeps current package/native/lockfile versions synchronized", () => {
     const versions = readReleaseVersions(process.cwd());
     expect(checkReleaseTag(`v${versions["package.json"]}`, versions)).toBe(versions["package.json"]);
+  });
+
+  /**
+   * Regression: version bumps changed only package.json, so v0.1.3 failed release validation.
+   * Sync must update only the app's own version lines and leave formatting/dependencies intact.
+   */
+  it("synchronizes native manifests to package.json without touching dependency versions", () => {
+    const root = manifests();
+    writeFileSync(resolve(root, "package.json"), '{\n  "name": "omarkd",\n  "version": "1.3.0-beta.1"\n}\n');
+    writeFileSync(resolve(root, "src-tauri/tauri.conf.json"), '{\n  "productName": "Omarkd",\n  "version": "1.2.3",\n  "plugins": { "x": { "version": "7.7.7" } }\n}\n');
+    expect(syncReleaseVersions(root)).toEqual(["src-tauri/tauri.conf.json", "src-tauri/Cargo.toml", "src-tauri/Cargo.lock"]);
+    expect(checkReleaseTag("v1.3.0-beta.1", readReleaseVersions(root))).toBe("1.3.0-beta.1");
+    expect(readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8")).toBe('{\n  "productName": "Omarkd",\n  "version": "1.3.0-beta.1",\n  "plugins": { "x": { "version": "7.7.7" } }\n}\n');
+    expect(readFileSync(resolve(root, "src-tauri/Cargo.toml"), "utf8")).toContain('other = "9.0.0"');
+    expect(readFileSync(resolve(root, "src-tauri/Cargo.lock"), "utf8")).toContain('name = "dependency"\nversion = "9.0.0"');
+    // A second sync is a no-op, so the version hook never creates empty changes.
+    expect(syncReleaseVersions(root)).toEqual([]);
+  });
+
+  /** Invalid source versions or missing targets fail instead of writing partial/mislabeled manifests. */
+  it("refuses to synchronize an invalid package version or an unrecognized manifest", () => {
+    const root = manifests();
+    writeFileSync(resolve(root, "package.json"), '{"version":"1.2"}');
+    expect(() => syncReleaseVersions(root)).toThrow("Invalid release tag");
+    expect(readFileSync(resolve(root, "src-tauri/Cargo.toml"), "utf8")).toContain('version = "1.2.3"');
+    writeFileSync(resolve(root, "package.json"), '{"version":"1.2.4"}');
+    writeFileSync(resolve(root, "src-tauri/Cargo.lock"), '[[package]]\nname = "omarkd"\nsource = "x"\nversion = "1.2.3"\n');
+    expect(() => syncReleaseVersions(root)).toThrow("src-tauri/Cargo.lock is missing");
+    // Validation precedes writes: earlier manifests stay untouched after a later failure.
+    expect(readFileSync(resolve(root, "src-tauri/tauri.conf.json"), "utf8")).toBe('{"version":"1.2.3"}');
+    writeFileSync(resolve(root, "src-tauri/Cargo.lock"), '[[package]]\nname = "omarkd"\nversion = "1.2.3"\n');
+    writeFileSync(resolve(root, "src-tauri/tauri.conf.json"), '{"plugins":{"x":{"version":"7.7.7"}},"version":"1.2.3"}');
+    expect(() => syncReleaseVersions(root)).toThrow("could not be updated safely");
+    expect(readFileSync(resolve(root, "src-tauri/Cargo.toml"), "utf8")).toContain('version = "1.2.3"');
+  });
+
+  /** npm and Bun version bumps run this hook before committing, so the bump commit includes every manifest. */
+  it("stages synchronized native manifests during package version bumps", () => {
+    const { scripts } = JSON.parse(readFileSync("package.json", "utf8"));
+    expect(scripts["version:sync"]).toBe("bun scripts/check-release.ts --sync");
+    expect(scripts.version).toBe("bun scripts/check-release.ts --sync && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock");
   });
 });
 

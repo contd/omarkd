@@ -3,7 +3,7 @@
  * Run before creating release assets so a mistag cannot publish mislabeled binaries.
  * @packageDocumentation
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -41,8 +41,45 @@ export function readReleaseVersions(root: string): Record<string, string> {
   return versions;
 }
 
+/**
+ * Copies package.json's version into the native manifests and the lockfile's own entry.
+ * Edits only each version line, preserving formatting and all dependency versions.
+ * @returns Files whose contents changed, for staging into a version-bump commit.
+ */
+export function syncReleaseVersions(root: string): string[] {
+  const version = readReleaseVersions(root)["package.json"];
+  checkReleaseTag(`v${version}`, { "package.json": version });
+  const updates: [path: string, file: string, contents: string][] = [];
+  for (const [file, pattern] of [
+    ["src-tauri/tauri.conf.json", /^(\s*\{[\s\S]*?"version"\s*:\s*")[^"]*(")/],
+    ["src-tauri/Cargo.toml", /(^\[package\]\s*$[\s\S]*?^version\s*=\s*")[^"]*(")/m],
+    ["src-tauri/Cargo.lock", /(^\[\[package\]\]\s*\nname = "omarkd"\s*\nversion\s*=\s*")[^"]*(")/m],
+  ] as const) {
+    const path = resolve(root, file);
+    const contents = readFileSync(path, "utf8");
+    if (!pattern.test(contents)) throw new Error(`${file} is missing the Omarkd package version.`);
+    const updated = contents.replace(pattern, (_match, before: string, after: string) => `${before}${version}${after}`);
+    // The first "version" key could belong to a nested object; require the top-level field changed.
+    if (file.endsWith(".json") && JSON.parse(updated).version !== version) {
+      throw new Error(`${file} top-level version could not be updated safely; edit it manually.`);
+    }
+    if (updated !== contents) updates.push([path, file, updated]);
+  }
+  // Every edit is validated above, so a late failure never leaves manifests half-synchronized.
+  for (const [path, , contents] of updates) writeFileSync(path, contents);
+  // Re-read every source so a missed edit can never be reported as synchronized.
+  checkReleaseTag(`v${version}`, readReleaseVersions(root));
+  return updates.map(([, file]) => file);
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const tag = process.argv[2];
-  if (!tag) throw new Error("Usage: bun run release:check vMAJOR.MINOR.PATCH");
-  console.log(`Release version verified: ${checkReleaseTag(tag, readReleaseVersions(process.cwd()))}`);
+  const argument = process.argv[2];
+  if (argument === "--sync") {
+    const changed = syncReleaseVersions(process.cwd());
+    console.log(changed.length ? `Synchronized version in: ${changed.join(", ")}` : "Versions already synchronized.");
+  } else if (argument) {
+    console.log(`Release version verified: ${checkReleaseTag(argument, readReleaseVersions(process.cwd()))}`);
+  } else {
+    throw new Error("Usage: bun run release:check vMAJOR.MINOR.PATCH | bun run version:sync");
+  }
 }
