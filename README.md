@@ -396,3 +396,63 @@ Serve `docs/typedoc/` over local HTTP to use all interactive report features;
 some Playwright/trace features may not work from a `file://` page. Share or publish
 test artifacts only after checking logs and source coverage for private paths or
 document contents. A browser bridge does not verify the native OS smoke checks.
+
+## Releases and GitHub Pages
+
+[Release automation](.github/workflows/release.yml) runs when a `v*` tag is pushed.
+It builds these unsigned installers with locked Bun/Cargo dependencies:
+
+| Platform | Architecture | Downloads |
+| --- | --- | --- |
+| macOS | Apple Silicon (ARM64) | DMG and app archive |
+| macOS | Intel (x64) | DMG and app archive |
+| Windows | x64 | NSIS setup executable |
+| Linux | x64 | DEB, RPM, AppImage |
+
+macOS downloads are not signed or notarized, and Windows downloads are not
+Authenticode-signed. OS trust warnings are expected; signing credentials are not
+required for these initial releases. There is no automatic updater configured.
+Native platform builds are checked on their respective runners, but native
+dialog/Finder/window-lifecycle smoke checks still require manual verification.
+
+Before releasing, keep the version in `package.json`, `src-tauri/tauri.conf.json`,
+the `[package]` section of `src-tauri/Cargo.toml`, and the `omarkd` entry in
+`src-tauri/Cargo.lock` identical. The release tag must match exactly:
+
+```sh
+bun run release:check v0.1.1
+# Commit and push the intended release changes first.
+git tag -a v0.1.1 -m "Omarkd v0.1.1"
+git push origin v0.1.1
+```
+
+Tags use `vMAJOR.MINOR.PATCH`, optionally followed by a SemVer prerelease such as
+`v0.2.0-beta.1`. Build metadata (`+...`) is not supported. Prerelease tags create
+GitHub prereleases. A mismatched/invalid tag stops before building or uploading.
+Bundles initially go to a draft release. Only after all four builds and the
+tested documentation deployment succeed does the workflow publish the release.
+If a build/deployment fails, the release remains draft; inspect the failure and
+rerun the failed jobs. Do not move a published tag.
+
+[Documentation automation](.github/workflows/pages.yml) also runs on pushes to
+`main` and can be started manually in Actions. It generates the site beneath
+`docs/typedoc/`, including fresh unit/coverage and browser reports, then copies
+Rustdoc into `docs/typedoc/rust/`. The generated folder is the Pages artifact root:
+
+- [Project documentation](https://contd.github.io/omarkd/)
+- [Unit tests and coverage](https://contd.github.io/omarkd/reports/unit/)
+- [Playwright results](https://contd.github.io/omarkd/reports/e2e/)
+- [Native Rust API](https://contd.github.io/omarkd/rust/omarkd_lib/)
+
+The maintained `docs/branding.css` remains source, and generated HTML stays
+Git-ignored. No `gh-pages` branch or committed HTML is needed. Failed documentation
+builds retain diagnostic artifacts in Actions for 14 days but never replace the
+live site. Reports/coverage contain source code and logs and are intentionally
+public on this project's Pages site.
+
+In repository **Settings > Pages**, set **Source** to **GitHub Actions**. The
+`github-pages` environment must allow the `main` branch and `v*` tags, including
+any required deployment approvals. Jobs use the repository's built-in
+`GITHUB_TOKEN`; grant the workflow its declared contents/Pages permissions.
+After cloning/forking, update the published links above and the release body's
+documentation URL for your repository.

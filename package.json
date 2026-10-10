@@ -28,6 +28,7 @@
     "app:dev": "tauri dev",
     "app:build": "tauri build",
     "app:icons": "tauri icon icon.svg",
+    "release:check": "bun scripts/check-release.ts",
     "install:cli": "sh scripts/install-cli.sh",
     "uninstall:cli": "sh scripts/uninstall-cli.sh",
     "docs": "bun run docs:ts && bun run docs:rust && bun run docs:reports",

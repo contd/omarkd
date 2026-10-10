@@ -1,0 +1,68 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+      - run: bun install --frozen-lockfile
+      - run: bun x playwright install --with-deps chromium
+      - run: bun run test:types
+      - run: bun run build
+      - name: Generate API docs and complete fresh test reports
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: bun run docs
+      - name: Include native API documentation and disable Jekyll processing
+        run: |
+          cp -R src-tauri/target/doc docs/typedoc/rust
+          touch docs/typedoc/.nojekyll
+      - name: Retain documentation and test diagnostics, including failed reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-diagnostics
+          path: docs/typedoc/
+          retention-days: 14
+          if-no-files-found: warn
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/typedoc
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy generated docs folder
+        id: deployment
+        uses: actions/deploy-pages@v4
